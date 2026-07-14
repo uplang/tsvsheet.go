@@ -40,9 +40,9 @@ Every frontend — CLI commands, the HTTP API behind `serve`, and the TUI — co
 
 | Method & path | Body → Response |
 | --- | --- |
-| `GET /api/state` | → `State` JSON (computed grid, template text, data grid, diagnostics) |
+| `GET /api/state` | → `State` JSON (computed grid, template text, data grid, diagnostics, `dirty`) |
 | `PUT /api/template` | `{"text": …}` → `State` or 422 with syntax error detail |
-| `PUT /api/data/cell` | `{"row": r, "col": c, "value": …}` → `State` |
+| `PUT /api/data/cell` | `{"row": r, "col": c, "value": …}` → `State` — `row`/`col` are **0-based raw-grid indices** (matching the §5 `[i,j]` numeric base, not the 1-based `Address` notation), so the embedded UI and session never disagree on the base |
 | `POST /api/save` | → writes `.tsvt` and `.tsv` back to their paths, `{"saved": true}` |
 | `GET /api/explain?cell=F4` | → `Trace` JSON |
 

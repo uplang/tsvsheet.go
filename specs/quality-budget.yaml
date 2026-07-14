@@ -12,7 +12,9 @@ receivers: value-only                # no pointer receivers except internal/sess
 # Scoring weights (sum to 100). Deliberate deviation from the standard model
 # (correctness 35 / reliability 10 vs 30 / 15): this is a language processor —
 # semantic correctness dominates; there is no long-running availability story
-# beyond the local serve process.
+# beyond the local serve process. Testability 20 / maintainability 15 (vs the
+# standard 15 / 20) likewise: the coverage-as-contract culture makes testability
+# the second lever, since a verified contract is the whole deliverable here.
 weights:
   correctness: 35
   testability: 20
