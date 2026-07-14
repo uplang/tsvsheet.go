@@ -16,5 +16,6 @@ const (
 	ErrNotFound        errs.Const = "not found"
 	ErrOpenFile        errs.Const = "failed to open file"
 	ErrReadInput       errs.Const = "failed to read input"
+	ErrSyntax          errs.Const = "syntax error"
 	ErrWriteFile       errs.Const = "failed to write file"
 )
