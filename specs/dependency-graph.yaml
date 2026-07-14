@@ -1,0 +1,31 @@
+# Capabilities and their dependencies — machine-readable.
+capabilities:
+  engine-parse:
+    depends_on: []
+    contracts: [engine-api]
+    status: planned
+
+  engine-compute:
+    depends_on: [engine-parse]
+    contracts: [engine-api]
+    status: planned
+
+  session:
+    depends_on: [engine-parse, engine-compute]
+    contracts: [engine-api]
+    status: planned
+
+  cli:
+    depends_on: [engine-parse, engine-compute]
+    contracts: [engine-api]
+    status: planned
+
+  serve:
+    depends_on: [session]
+    contracts: [engine-api]
+    status: planned
+
+  tui:
+    depends_on: [session]
+    contracts: [engine-api]
+    status: planned
