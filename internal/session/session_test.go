@@ -100,6 +100,16 @@ func TestSetDataCell_EditsAndRecomputes(t *testing.T) {
 	assert.True(t, state.Dirty)
 }
 
+func TestSetDataCell_RejectsNegativeAddress(t *testing.T) {
+	t.Parallel()
+
+	s := newSession(t)
+	err := s.SetDataCell(sheet.Address{Row: -1, Col: 0}, "x")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	assert.False(t, s.Snapshot().Dirty) // rejected before any mutation
+}
+
 func TestSetDataCell_GrowsGridOnAppend(t *testing.T) {
 	t.Parallel()
 
@@ -142,6 +152,23 @@ func TestSnapshot_IsIsolatedCopy(t *testing.T) {
 	state := s.Snapshot()
 	state.Computed[0][0] = "mutated"                  // mutate the snapshot
 	assert.Equal(t, "1", s.Snapshot().Computed[0][0]) // session unaffected
+}
+
+func TestExplain(t *testing.T) {
+	t.Parallel()
+
+	trace, err := newSession(t).Explain(sheet.Address{Row: 0, Col: 4}) // E1 = C+D
+	require.NoError(t, err)
+	assert.Equal(t, "7", trace.Value)
+	assert.Equal(t, "C + D", trace.Formula)
+}
+
+func TestExplain_OutOfGrid(t *testing.T) {
+	t.Parallel()
+
+	_, err := newSession(t).Explain(sheet.Address{Row: 99, Col: 0})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrNotFound)
 }
 
 func TestConcurrentAccess(t *testing.T) {

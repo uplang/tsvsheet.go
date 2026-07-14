@@ -9,16 +9,16 @@ import (
 // formula that wrote it (empty for a plain data cell), and the resolved value
 // of each reference the formula reads.
 type Trace struct {
-	Cell    Address
-	Value   string
-	Formula string
-	Inputs  []TraceInput
+	Cell    Address      `json:"cell"`
+	Value   string       `json:"value"`
+	Formula string       `json:"formula,omitempty"`
+	Inputs  []TraceInput `json:"inputs,omitempty"`
 }
 
 // TraceInput is one reference a formula reads, with its resolved value.
 type TraceInput struct {
-	Ref   string
-	Value string
+	Ref   string `json:"ref"`
+	Value string `json:"value"`
 }
 
 // Explain computes the grid and describes the cell at at: its value, and — when

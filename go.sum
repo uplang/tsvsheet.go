@@ -5,6 +5,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gomatic/go-error v0.2.2 h1:idSMJduSTDFOp48MnuhMsBH53HrHd8P7LNhdWHtWaVg=
 github.com/gomatic/go-error v0.2.2/go.mod h1:+PAmcazlzCIDFBglesekV1LUQTEaQB+5801gftMxgZY=
+github.com/gomatic/go-httpserver v0.2.0 h1:VJe5AqCYgzSELffVJDqXWPfncsDwOTN9f30k5Jjs/LM=
+github.com/gomatic/go-httpserver v0.2.0/go.mod h1:yWOitkU85Sd/OoWQQ1ZT/M91OK2AbSwfqmaAvE0zO3g=
 github.com/gomatic/go-log v0.2.0 h1:aENZTfpIj4ifbhmx/8KOIDkDukdxquRfMfYHbdo9RIY=
 github.com/gomatic/go-log v0.2.0/go.mod h1:8yusazmzf+STyWR3swgBte1xFVSBXQmaOtJaLBTzV0s=
 github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=

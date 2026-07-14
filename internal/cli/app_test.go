@@ -157,9 +157,8 @@ func TestRunExplain_DataReadError(t *testing.T) {
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
 
-func TestStubs_NotImplemented(t *testing.T) {
+func TestTUIStub_NotImplemented(t *testing.T) {
 	t.Parallel()
 
-	assert.ErrorIs(t, runServe(Streams{}, serveConfig{}), constants.ErrUnsupported)
 	assert.ErrorIs(t, runTUI(Streams{}, tuiConfig{}), constants.ErrUnsupported)
 }

@@ -10,8 +10,8 @@ import (
 // Address is a cell coordinate in spreadsheet notation (`F4`): column letters
 // plus a 1-based row. It carries 0-based indices internally.
 type Address struct {
-	Row int // 0-based
-	Col int // 0-based
+	Row int `json:"row"` // 0-based
+	Col int `json:"col"` // 0-based
 }
 
 // ParseAddress parses spreadsheet notation (`A1`, `F4`, `AA10`) into an

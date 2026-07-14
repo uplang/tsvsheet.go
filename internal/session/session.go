@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/uplang/tsvsheet.go/internal/constants"
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 	"github.com/uplang/tsvsheet.go/internal/tsvt"
 )
@@ -80,11 +81,14 @@ func (s *Session) SetTemplate(src []byte) error {
 }
 
 // SetDataCell edits one raw data cell (growing the grid to reach an append
-// position), then recomputes. The template is unchanged and already valid, so
-// the recompute cannot newly fail; the error is returned for seam symmetry.
+// position), then recomputes. A negative address is rejected; otherwise the
+// template is unchanged and already valid, so the recompute does not newly fail.
 func (s *Session) SetDataCell(a sheet.Address, value string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if a.Row < 0 || a.Col < 0 {
+		return constants.ErrInvalidValue.With(nil, "cell", a.String())
+	}
 	s.data = setCell(s.data, a.Row, a.Col, value)
 	s.dirty = true
 	return s.loadTemplate(s.templateSrc)
@@ -102,6 +106,14 @@ func (s *Session) Snapshot() State {
 		Diagnostics: append([]sheet.Diagnostic(nil), s.diagnostics...),
 		Dirty:       s.dirty,
 	}
+}
+
+// Explain traces how the computed cell at addr was produced, over the current
+// template and data (see sheet.Explain).
+func (s *Session) Explain(addr sheet.Address) (sheet.Trace, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return sheet.Explain(s.template, s.data, addr)
 }
 
 // MarkSaved clears the dirty flag after a frontend persists the worksheet.

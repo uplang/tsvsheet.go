@@ -11,9 +11,9 @@ import (
 // reject the template; a non-fatal one is advisory (the construct still
 // computes, e.g. an unknown function to #NAME?).
 type Diagnostic struct {
-	Line    tsvt.LineNumber
-	Message string
-	Fatal   bool
+	Line    tsvt.LineNumber `json:"line"`
+	Message string          `json:"message"`
+	Fatal   bool            `json:"fatal"`
 }
 
 // err renders a fatal diagnostic as its sentinel error.

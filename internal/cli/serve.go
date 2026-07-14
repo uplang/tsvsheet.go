@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+
 	"github.com/urfave/cli/v3"
 )
 
@@ -43,6 +45,6 @@ Examples:
 				Destination: &cfg.port,
 			},
 		),
-		Action: streamAction(func(s Streams) error { return runServe(s, cfg) }),
+		Action: func(ctx context.Context, _ *cli.Command) error { return runServe(ctx, cfg) },
 	}
 }

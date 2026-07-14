@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsvsheet</title>
+<style>
+  :root {
+    --ink: #1b2733;
+    --paper: #fbfaf6;
+    --rule: #d9d6cc;
+    --rule-strong: #b9b5a8;
+    --head: #6b7a86;
+    --head-bg: #f0ede4;
+    --compute: #f7f1e2;
+    --compute-mark: #c98a1a;
+    --err: #b3261e;
+    --err-bg: #fbe9e7;
+    --accent: #1f5c8a;
+    --dirty: #c98a1a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #d8dee6; --paper: #12161b; --rule: #29313a; --rule-strong: #3a444f;
+      --head: #7d8b98; --head-bg: #1a1f26; --compute: #221d12; --compute-mark: #d7a24a;
+      --err: #ff6b5e; --err-bg: #2a1613; --accent: #5aa0d6; --dirty: #d7a24a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--mono);
+    color: var(--ink);
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--rule-strong);
+    flex-wrap: wrap;
+  }
+  header .mark { font-weight: 700; letter-spacing: 0.02em; }
+  header .mark b { color: var(--accent); }
+  header .files { color: var(--head); font-size: 12px; }
+  header .spacer { flex: 1; }
+  .state { font-size: 12px; color: var(--head); }
+  .state.dirty { color: var(--dirty); }
+  .state.dirty::before { content: "● "; }
+  button {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--head-bg);
+    border: 1px solid var(--rule-strong);
+    padding: 0.3rem 0.8rem;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  main { flex: 1; display: flex; min-height: 0; }
+  .grid-pane { flex: 1; overflow: auto; padding: 1rem; }
+  .side {
+    width: 340px;
+    max-width: 40vw;
+    border-left: 1px solid var(--rule-strong);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .side h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--head);
+    margin: 0;
+    padding: 0.6rem 1rem 0.3rem;
+    font-weight: 600;
+  }
+  #template {
+    flex: 1;
+    resize: none;
+    border: none;
+    border-top: 1px solid var(--rule);
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    padding: 0.6rem 1rem;
+    tab-size: 8;
+  }
+  #template:focus { outline: none; background: var(--head-bg); }
+  .side footer { padding: 0.5rem 1rem; border-top: 1px solid var(--rule); }
+  .diagnostics { max-height: 30%; overflow: auto; padding: 0 1rem 0.6rem; }
+  .diag { color: var(--err); font-size: 12px; padding: 0.15rem 0; }
+  .diag .fatal { font-weight: 700; }
+  table { border-collapse: collapse; }
+  th, td {
+    border: 1px solid var(--rule);
+    padding: 0.15rem 0.5rem;
+    text-align: right;
+    white-space: pre;
+    min-width: 2.4rem;
+    height: 1.6rem;
+  }
+  thead th, td.rownum {
+    background: var(--head-bg);
+    color: var(--head);
+    text-align: center;
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+  }
+  td.rownum { position: sticky; left: 0; top: auto; text-align: right; }
+  td.data { cursor: text; }
+  td.data:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
+  td.computed { background: var(--compute); border-left: 2px solid var(--compute-mark); cursor: default; }
+  td.err { background: var(--err-bg); color: var(--err); }
+  td input {
+    font-family: var(--mono);
+    font-size: 13px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    text-align: right;
+    padding: 0;
+  }
+  td input:focus { outline: none; }
+  .empty-hint { color: var(--head); padding: 2rem; }
+</style>
+</head>
+<body>
+<header>
+  <span class="mark">tsv<b>sheet</b></span>
+  <span class="files">data · template → computed sheet</span>
+  <span class="spacer"></span>
+  <span id="state" class="state">loading…</span>
+  <button id="save" type="button">Save</button>
+</header>
+<main>
+  <section class="grid-pane" aria-label="Computed sheet">
+    <div id="grid"></div>
+  </section>
+  <aside class="side">
+    <h2>Template · .tsvt</h2>
+    <textarea id="template" spellcheck="false" aria-label="Template source"></textarea>
+    <div id="diagnostics" class="diagnostics" aria-live="polite"></div>
+    <footer><button id="apply" type="button">Apply template</button></footer>
+  </aside>
+</main>
+<script>
+(() => {
+  const ERR = /^#(REF|VALUE|NAME|DIV\/0)!?$|^#[A-Z]+[!?]$/;
+  const els = {
+    grid: document.getElementById("grid"),
+    template: document.getElementById("template"),
+    diagnostics: document.getElementById("diagnostics"),
+    state: document.getElementById("state"),
+    save: document.getElementById("save"),
+    apply: document.getElementById("apply"),
+  };
+  let editingTemplate = false;
+
+  const colLabel = (n) => {
+    let s = "";
+    for (n += 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
+    return s;
+  };
+
+  const dataWidth = (data) => data.reduce((w, row) => Math.max(w, row.length), 0);
+
+  async function api(method, path, body) {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || res.statusText);
+    return payload;
+  }
+
+  function render(state) {
+    renderGrid(state);
+    if (!editingTemplate) els.template.value = state.template;
+    renderDiagnostics(state.diagnostics);
+    els.state.textContent = state.dirty ? "unsaved changes" : "saved";
+    els.state.classList.toggle("dirty", state.dirty);
+  }
+
+  function renderGrid(state) {
+    const computed = state.computed;
+    const dw = dataWidth(state.data);
+    const width = computed.reduce((w, row) => Math.max(w, row.length), dw);
+    if (!computed.length && !dw) {
+      els.grid.innerHTML = '<p class="empty-hint">Empty worksheet. Edit the template, then add data.</p>';
+      return;
+    }
+    const table = document.createElement("table");
+    table.append(headRow(width), ...computed.map((row, r) => bodyRow(state, row, r, width, dw)));
+    els.grid.replaceChildren(table);
+  }
+
+  function headRow(width) {
+    const tr = document.createElement("tr");
+    tr.append(th(""));
+    for (let c = 0; c < width; c++) tr.append(th(colLabel(c)));
+    const thead = document.createElement("thead");
+    thead.append(tr);
+    return thead;
+  }
+
+  function th(text) {
+    const el = document.createElement("th");
+    el.textContent = text;
+    return el;
+  }
+
+  function bodyRow(state, row, r, width, dw) {
+    const tr = document.createElement("tr");
+    const num = document.createElement("td");
+    num.className = "rownum";
+    num.textContent = r + 1;
+    tr.append(num);
+    for (let c = 0; c < width; c++) tr.append(cell(state, row[c] ?? "", r, c, dw));
+    return tr;
+  }
+
+  function cell(state, value, r, c, dw) {
+    const td = document.createElement("td");
+    td.textContent = value;
+    const editable = r < state.data.length && c < dw;
+    td.className = editable ? "data" : "computed";
+    if (ERR.test(value)) td.classList.add("err");
+    if (editable) td.addEventListener("click", () => editCell(td, r, c, value));
+    return td;
+  }
+
+  function editCell(td, r, c, value) {
+    const input = document.createElement("input");
+    input.value = value;
+    td.replaceChildren(input);
+    input.focus();
+    input.select();
+    const commit = async () => {
+      if (input.value === value) return render(await api("GET", "/api/state"));
+      render(await api("PUT", "/api/data/cell", { row: r, col: c, value: input.value }));
+    };
+    input.addEventListener("blur", () => commit().catch(reportError));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+      if (e.key === "Escape") { input.value = value; input.blur(); }
+    });
+  }
+
+  function renderDiagnostics(diags) {
+    els.diagnostics.replaceChildren(...(diags || []).map((d) => {
+      const el = document.createElement("div");
+      el.className = "diag";
+      el.innerHTML = `<span class="${d.fatal ? "fatal" : ""}">line ${d.line}:</span> ${escapeHTML(d.message)}`;
+      return el;
+    }));
+  }
+
+  function escapeHTML(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function reportError(err) {
+    els.diagnostics.replaceChildren(Object.assign(document.createElement("div"), {
+      className: "diag", textContent: err.message,
+    }));
+  }
+
+  async function applyTemplate() {
+    editingTemplate = false;
+    try {
+      render(await api("PUT", "/api/template", { text: els.template.value }));
+    } catch (err) {
+      reportError(err);
+    }
+  }
+
+  els.template.addEventListener("focus", () => { editingTemplate = true; });
+  els.template.addEventListener("blur", applyTemplate);
+  els.apply.addEventListener("click", applyTemplate);
+  els.save.addEventListener("click", async () => {
+    try {
+      await api("POST", "/api/save");
+      render(await api("GET", "/api/state"));
+    } catch (err) {
+      reportError(err);
+    }
+  });
+
+  api("GET", "/api/state").then(render).catch(reportError);
+})();
+</script>
+</body>
+</html>
