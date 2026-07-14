@@ -7,7 +7,7 @@ import "github.com/uplang/tsvsheet.go/internal/tsvt"
 func (r resolver) eval(expr tsvt.Expr) Value {
 	switch e := expr.(type) {
 	case tsvt.Number:
-		return value(e.Text)
+		return value(textVal(e.Text))
 	case tsvt.RefOperand:
 		return r.resolveOperand(e.Ref).scalar()
 	case tsvt.Unary:
@@ -27,9 +27,9 @@ func (r resolver) evalUnary(e tsvt.Unary) Value {
 		return v
 	}
 	if e.Op == tsvt.OpNeg {
-		return numberValue(-n)
+		return numberValue(floatVal(-n))
 	}
-	return numberValue(n)
+	return numberValue(floatVal(n))
 }
 
 // evalBinary evaluates a binary operation, propagating an error operand before
@@ -70,12 +70,12 @@ func arithmetic(op tsvt.BinaryOp, left, right Value) Value {
 	if rv.isError() {
 		return rv
 	}
-	return apply(op, l, r)
+	return apply(op, floatVal(l), floatVal(r))
 }
 
 // apply computes a numeric binary result, guarding division/modulo by zero
 // (ADR 0003 rule 14).
-func apply(op tsvt.BinaryOp, l, r float64) Value {
+func apply(op tsvt.BinaryOp, l, r floatVal) Value {
 	switch op {
 	case tsvt.OpMul:
 		return numberValue(l * r)
@@ -89,7 +89,7 @@ func apply(op tsvt.BinaryOp, l, r float64) Value {
 }
 
 // divide applies division or modulo, yielding #DIV/0! on a zero divisor.
-func divide(op tsvt.BinaryOp, l, r float64) Value {
+func divide(op tsvt.BinaryOp, l, r floatVal) Value {
 	if r == 0 {
 		return errorValue(ErrDiv)
 	}

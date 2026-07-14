@@ -64,7 +64,7 @@ func TestParse_Testdata(t *testing.T) {
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
 			t.Parallel()
-			src, err := os.ReadFile(file) //nolint:gosec // fixed testdata path
+			src, err := os.ReadFile(file)
 			require.NoError(t, err)
 
 			tmpl, err := tsvt.Parse(src)

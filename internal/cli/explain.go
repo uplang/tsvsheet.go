@@ -16,13 +16,16 @@ type explainConfig struct {
 	template sourcePath
 	data     sourcePath
 	cell     string
-	asJSON   bool
+	isJSON   bool
 }
+
+// jsonOutput selects the JSON rendering of a trace.
+type jsonOutput bool
 
 // runExplain traces how the target cell was computed, writing a human-readable
 // report or JSON to the output stream.
 func runExplain(streams Streams, cfg explainConfig) error {
-	at, err := sheet.ParseAddress(cfg.cell)
+	at, err := sheet.ParseAddress(sheet.AddressText(cfg.cell))
 	if err != nil {
 		return err
 	}
@@ -36,7 +39,7 @@ func runExplain(streams Streams, cfg explainConfig) error {
 	if err != nil {
 		return err
 	}
-	return writeTrace(streams.Out, trace, cfg.asJSON)
+	return writeTrace(streams.Out, trace, jsonOutput(cfg.isJSON))
 }
 
 // traceCell parses, reads, and explains the target cell.
@@ -53,8 +56,8 @@ func traceCell(templateReader, dataReader io.Reader, at sheet.Address) (sheet.Tr
 }
 
 // writeTrace renders a trace as JSON or a human-readable report.
-func writeTrace(w io.Writer, trace sheet.Trace, asJSON bool) error {
-	if asJSON {
+func writeTrace(w io.Writer, trace sheet.Trace, isJSON jsonOutput) error {
+	if isJSON {
 		return writeJSON(w, traceJSON(trace))
 	}
 	return writeTraceText(w, trace)
@@ -62,12 +65,12 @@ func writeTrace(w io.Writer, trace sheet.Trace, asJSON bool) error {
 
 // writeTraceText writes the human-readable trace report.
 func writeTraceText(w io.Writer, trace sheet.Trace) error {
-	fmt.Fprintf(w, "%s = %s\n", trace.Cell.String(), trace.Value)
+	_, _ = fmt.Fprintf(w, "%s = %s\n", trace.Cell.String(), trace.Value)
 	if trace.Formula != "" {
-		fmt.Fprintf(w, "  formula: %s\n", trace.Formula)
+		_, _ = fmt.Fprintf(w, "  formula: %s\n", trace.Formula)
 	}
 	for _, in := range trace.Inputs {
-		fmt.Fprintf(w, "  %s = %s\n", in.Ref, in.Value)
+		_, _ = fmt.Fprintf(w, "  %s = %s\n", in.Ref, in.Value)
 	}
 	return nil
 }
@@ -109,8 +112,12 @@ func writeJSON(w io.Writer, v any) error {
 // explainCommand builds the `explain` command.
 func explainCommand() *cli.Command {
 	cfg := explainConfig{}
+	tmpl := buildTemplateFlag()
+	tmpl.Destination = (*string)(&cfg.template)
+	data := buildDataFlag()
+	data.Destination = (*string)(&cfg.data)
 	return &cli.Command{
-		Name:      "explain",
+		Name:      cmdExplain,
 		Usage:     "Trace how one computed cell was produced.",
 		ArgsUsage: " ",
 		Description: `Explain a single output cell: its value, the formula that produced it, and
@@ -119,8 +126,9 @@ the resolved value of each reference the formula reads.
 Examples:
   tsvsheet explain --cell F4 --template sheet.tsvt --data sheet.tsv
   tsvsheet explain --cell F4 --json --template sheet.tsvt --data sheet.tsv`,
-		Flags: append(
-			sourceFlags(&cfg.template, &cfg.data),
+		Flags: []cli.Flag{
+			tmpl,
+			data,
 			&cli.StringFlag{
 				Name:        cellFlag,
 				Aliases:     []string{"c"},
@@ -131,9 +139,9 @@ Examples:
 			&cli.BoolFlag{
 				Name:        jsonFlag,
 				Usage:       "Emit the trace as JSON",
-				Destination: &cfg.asJSON,
+				Destination: &cfg.isJSON,
 			},
-		),
+		},
 		Action: streamAction(func(s Streams) error { return runExplain(s, cfg) }),
 	}
 }

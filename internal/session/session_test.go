@@ -31,7 +31,7 @@ func TestNew_ComputesEagerly(t *testing.T) {
 	state := newSession(t).Snapshot()
 	assert.Equal(t, "7", state.Computed[0][4]) // C+D at row 0 = 3+4
 	assert.Equal(t, "=body\nE=C + D\n", state.Template)
-	assert.False(t, state.Dirty)
+	assert.False(t, state.IsDirty)
 	assert.Empty(t, state.Diagnostics)
 }
 
@@ -58,7 +58,7 @@ func TestSetTemplate_RecomputesAndDirties(t *testing.T) {
 	require.NoError(t, s.SetTemplate([]byte("=body\nE=C * D\n")))
 	state := s.Snapshot()
 	assert.Equal(t, "12", state.Computed[0][4]) // C*D at row 0 = 3*4
-	assert.True(t, state.Dirty)
+	assert.True(t, state.IsDirty)
 }
 
 func TestSetTemplate_AtomicOnSyntaxError(t *testing.T) {
@@ -74,7 +74,7 @@ func TestSetTemplate_AtomicOnSyntaxError(t *testing.T) {
 	after := s.Snapshot()
 	assert.Equal(t, before.Computed, after.Computed)
 	assert.Equal(t, before.Template, after.Template)
-	assert.False(t, after.Dirty) // unchanged: still clean
+	assert.False(t, after.IsDirty) // unchanged: still clean
 }
 
 func TestSetTemplate_AtomicOnRejectedTemplate(t *testing.T) {
@@ -97,7 +97,7 @@ func TestSetDataCell_EditsAndRecomputes(t *testing.T) {
 	state := s.Snapshot()
 	assert.Equal(t, "10", state.Data[0][2])
 	assert.Equal(t, "14", state.Computed[0][4]) // C+D = 10+4
-	assert.True(t, state.Dirty)
+	assert.True(t, state.IsDirty)
 }
 
 func TestSetDataCell_RejectsNegativeAddress(t *testing.T) {
@@ -107,7 +107,7 @@ func TestSetDataCell_RejectsNegativeAddress(t *testing.T) {
 	err := s.SetDataCell(sheet.Address{Row: -1, Col: 0}, "x")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
-	assert.False(t, s.Snapshot().Dirty) // rejected before any mutation
+	assert.False(t, s.Snapshot().IsDirty) // rejected before any mutation
 }
 
 func TestSetDataCell_GrowsGridOnAppend(t *testing.T) {
@@ -124,13 +124,13 @@ func TestDirtyLifecycle(t *testing.T) {
 	t.Parallel()
 
 	s := newSession(t)
-	assert.False(t, s.Snapshot().Dirty)
+	assert.False(t, s.Snapshot().IsDirty)
 
 	require.NoError(t, s.SetDataCell(sheet.Address{Row: 0, Col: 0}, "9"))
-	assert.True(t, s.Snapshot().Dirty)
+	assert.True(t, s.Snapshot().IsDirty)
 
 	s.MarkSaved()
-	assert.False(t, s.Snapshot().Dirty)
+	assert.False(t, s.Snapshot().IsDirty)
 }
 
 func TestTemplateText(t *testing.T) {
@@ -178,7 +178,7 @@ func TestConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
-		go func(n int) {
+		go func(_ int) {
 			defer wg.Done()
 			_ = s.SetDataCell(sheet.Address{Row: 0, Col: 0}, "x")
 			_ = s.Snapshot()

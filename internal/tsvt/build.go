@@ -93,7 +93,8 @@ func buildRow(ctx grammar.ICellsContext) (Line, error) {
 	for _, child := range children {
 		cell, ok := child.(grammar.ICellContext)
 		if !ok { // a TAB terminal: close the current slot
-			cells, filled = closeSlot(cells, filled)
+			cells = closeSlot(cells, slotFilled(filled))
+			filled = false
 			continue
 		}
 		built, err := buildCell(cell)
@@ -108,13 +109,16 @@ func buildRow(ctx grammar.ICellsContext) (Line, error) {
 	return Row{At: lineOf(ctx), Cells: cells}, nil
 }
 
+// slotFilled reports whether the current TSV field already holds a cell.
+type slotFilled bool
+
 // closeSlot ends the field before a TAB, inserting an EmptyCell when the field
 // had no cell.
-func closeSlot(cells []Cell, filled bool) ([]Cell, bool) {
-	if !filled {
-		return append(cells, EmptyCell{}), false
+func closeSlot(cells []Cell, isFilled slotFilled) []Cell {
+	if !isFilled {
+		return append(cells, EmptyCell{})
 	}
-	return cells, false
+	return cells
 }
 
 // buildCell dispatches on the three cell shapes: formula, placement, literal.

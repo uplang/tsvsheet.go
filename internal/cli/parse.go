@@ -88,8 +88,10 @@ func lineNumberOf(line tsvt.Line) tsvt.LineNumber {
 // parseCommand builds the `parse` command.
 func parseCommand() *cli.Command {
 	cfg := parseConfig{}
+	tmpl := buildTemplateFlag()
+	tmpl.Destination = (*string)(&cfg.template)
 	return &cli.Command{
-		Name:      "parse",
+		Name:      cmdParse,
 		Usage:     "Parse a template and emit its structure as JSON.",
 		ArgsUsage: " ",
 		Description: `Parse a .tsvt template and write its line structure as JSON to stdout — a
@@ -98,7 +100,7 @@ stable surface for scripting and tooling.
 Examples:
   tsvsheet parse --template sheet.tsvt | jq '.lines[].kind'
   cat sheet.tsvt | tsvsheet parse`,
-		Flags:  templateFlagOnly(&cfg.template),
+		Flags:  []cli.Flag{tmpl},
 		Action: streamAction(func(s Streams) error { return runParse(s, cfg) }),
 	}
 }

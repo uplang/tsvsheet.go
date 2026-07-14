@@ -59,7 +59,7 @@ func buildColRef(ctx grammar.IColRefContext) Col {
 	letters := ctx.COL()
 	switch {
 	case letters != nil && ctx.DOLLAR() != nil:
-		return ColLetters{Name: letters.GetText(), Abs: true}
+		return ColLetters{Name: letters.GetText(), IsAbs: true}
 	case letters != nil:
 		return ColLetters{Name: letters.GetText()}
 	case ctx.DOLLAR() != nil:

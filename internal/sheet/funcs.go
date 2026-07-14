@@ -9,17 +9,17 @@ import (
 
 // mod is truncated-toward-zero remainder, defined for negative and fractional
 // operands (ADR 0003 rule 14).
-func mod(l, r float64) float64 { return math.Mod(l, r) }
+func mod(l, r floatVal) floatVal { return floatVal(math.Mod(float64(l), float64(r))) }
 
 // compare applies a §11 comparison, yielding 1 (true) or 0 (false): numeric
 // when both operands are numeric, lexicographic when both are strings, #VALUE!
 // for mixed (ADR 0003 rule 12).
 func compare(op tsvt.BinaryOp, left, right Value) Value {
 	if left.kind == kindNumber && right.kind == kindNumber {
-		return boolValue(numberOrder(op, left.num, right.num))
+		return boolValue(boolResult(numberOrder(op, floatVal(left.num), floatVal(right.num))))
 	}
 	if bothText(left, right) {
-		return boolValue(stringOrder(op, text(left), text(right)))
+		return boolValue(boolResult(stringOrder(op, textVal(text(left)), textVal(text(right)))))
 	}
 	return errorValue(ErrValue)
 }
@@ -41,15 +41,15 @@ func text(v Value) string {
 }
 
 // boolValue maps a Go bool to the 1/0 numeric result of a comparison.
-func boolValue(b bool) Value {
-	if b {
+func boolValue(isTrue boolResult) Value {
+	if isTrue {
 		return numberValue(1)
 	}
 	return numberValue(0)
 }
 
 // numberOrder evaluates a comparison over two numbers.
-func numberOrder(op tsvt.BinaryOp, l, r float64) bool {
+func numberOrder(op tsvt.BinaryOp, l, r floatVal) bool {
 	switch op {
 	case tsvt.OpEq:
 		return l == r
@@ -67,8 +67,8 @@ func numberOrder(op tsvt.BinaryOp, l, r float64) bool {
 }
 
 // stringOrder evaluates a comparison over two strings lexicographically.
-func stringOrder(op tsvt.BinaryOp, l, r string) bool {
-	return numberOrder(op, float64(strings.Compare(l, r)), 0)
+func stringOrder(op tsvt.BinaryOp, l, r textVal) bool {
+	return numberOrder(op, floatVal(strings.Compare(string(l), string(r))), 0)
 }
 
 // evalCall dispatches a function call by case-insensitive name (§11.3); an

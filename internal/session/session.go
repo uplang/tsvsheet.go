@@ -23,7 +23,7 @@ type State struct {
 	Template    string             `json:"template"`
 	Data        [][]string         `json:"data"`
 	Diagnostics []sheet.Diagnostic `json:"diagnostics"`
-	Dirty       bool               `json:"dirty"`
+	IsDirty     bool               `json:"dirty"`
 }
 
 // Session is a mutable worksheet. Its methods are safe for concurrent use.
@@ -34,7 +34,7 @@ type Session struct {
 	computed    sheet.Grid
 	diagnostics []sheet.Diagnostic
 	mu          sync.Mutex
-	dirty       bool
+	isDirty     bool
 }
 
 // New builds a session from template source and a data grid, parsing and
@@ -76,7 +76,7 @@ func (s *Session) SetTemplate(src []byte) error {
 	if err := s.loadTemplate(src); err != nil {
 		return err
 	}
-	s.dirty = true
+	s.isDirty = true
 	return nil
 }
 
@@ -89,8 +89,8 @@ func (s *Session) SetDataCell(a sheet.Address, value string) error {
 	if a.Row < 0 || a.Col < 0 {
 		return constants.ErrInvalidValue.With(nil, "cell", a.String())
 	}
-	s.data = setCell(s.data, a.Row, a.Col, value)
-	s.dirty = true
+	s.data = setCell(s.data, rowIndex(a.Row), colIndex(a.Col), cellText(value))
+	s.isDirty = true
 	return s.loadTemplate(s.templateSrc)
 }
 
@@ -104,7 +104,7 @@ func (s *Session) Snapshot() State {
 		Template:    string(s.templateSrc),
 		Data:        grid(s.data),
 		Diagnostics: append([]sheet.Diagnostic(nil), s.diagnostics...),
-		Dirty:       s.dirty,
+		IsDirty:     s.isDirty,
 	}
 }
 
@@ -120,7 +120,7 @@ func (s *Session) Explain(addr sheet.Address) (sheet.Trace, error) {
 func (s *Session) MarkSaved() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.dirty = false
+	s.isDirty = false
 }
 
 // TemplateText returns a copy of the template source for saving.
@@ -137,25 +137,34 @@ func (s *Session) DataTSV() []byte {
 	defer s.mu.Unlock()
 	var b strings.Builder
 	for _, row := range s.data {
-		b.WriteString(strings.Join(row, "\t"))
-		b.WriteByte('\n')
+		_, _ = b.WriteString(strings.Join(row, "\t"))
+		_ = b.WriteByte('\n')
 	}
 	return []byte(b.String())
 }
 
+// rowIndex is a 0-based grid row; colIndex a 0-based grid column; cellText a
+// raw cell value.
+type (
+	rowIndex int
+	colIndex int
+	cellText string
+)
+
 // setCell writes value at (row, col), growing the grid with empty rows and
 // cells so an append position (one past the end) creates new space.
-func setCell(g sheet.Grid, row, col int, value string) sheet.Grid {
+func setCell(g sheet.Grid, row rowIndex, col colIndex, value cellText) sheet.Grid {
 	out := cloneGrid(g)
-	for len(out) <= row {
+	r, c := int(row), int(col)
+	for len(out) <= r {
 		out = append(out, []string{})
 	}
-	line := out[row]
-	for len(line) <= col {
+	line := out[r]
+	for len(line) <= c {
 		line = append(line, "")
 	}
-	line[col] = value
-	out[row] = line
+	line[c] = string(value)
+	out[r] = line
 	return out
 }
 

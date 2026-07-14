@@ -11,6 +11,12 @@ import (
 // cellWidth is the fixed display width of a grid cell.
 const cellWidth = 8
 
+// displayText is a rendered fragment; displayInt a value shown in the grid.
+type (
+	displayText string
+	displayInt  int
+)
+
 // styles for the terminal grid, tuned for a monospace "ledger" look matching
 // the web UI: muted headers, tinted computed cells, flagged error values.
 var (
@@ -27,7 +33,7 @@ var (
 
 // View implements tea.Model.
 func (m Model) View() string {
-	if m.quitting {
+	if m.isQuitting {
 		return ""
 	}
 	sections := []string{m.titleBar(), m.grid()}
@@ -41,7 +47,7 @@ func (m Model) View() string {
 // titleBar renders the header line with the dirty indicator.
 func (m Model) titleBar() string {
 	state := "saved"
-	if m.state.Dirty {
+	if m.state.IsDirty {
 		state = dirtyStyle.Render("● unsaved")
 	}
 	return titleStyle.Render("tsvsheet") + "  " + state
@@ -61,14 +67,14 @@ func (m Model) grid() string {
 func (m Model) headerRow() string {
 	cells := []string{headStyle.Render("")}
 	for c := 0; c < m.width(); c++ {
-		cells = append(cells, headStyle.Render(columnLabel(c)))
+		cells = append(cells, headStyle.Render(columnLabel(cursorPos(c))))
 	}
 	return strings.Join(cells, " ")
 }
 
 // gridRow renders one data row with its row number.
 func (m Model) gridRow(row int) string {
-	cells := []string{headStyle.Render(itoa(row + 1))}
+	cells := []string{headStyle.Render(itoa(displayInt(row + 1)))}
 	for c := 0; c < m.width(); c++ {
 		cells = append(cells, m.renderCell(row, c))
 	}
@@ -78,7 +84,7 @@ func (m Model) gridRow(row int) string {
 // renderCell styles one grid cell by its kind and cursor state.
 func (m Model) renderCell(row, col int) string {
 	value := m.computedValue(row, col)
-	return m.cellStyle(row, col, value).Render(clip(value))
+	return m.cellStyle(row, col, value).Render(clip(displayText(value)))
 }
 
 // cellStyle selects the style for a cell: cursor, error, computed, or data.
@@ -86,7 +92,7 @@ func (m Model) cellStyle(row, col int, value string) lipgloss.Style {
 	if row == m.row && col == m.col {
 		return cursorStyle
 	}
-	if isErrorValue(value) {
+	if isErrorValue(displayText(value)) {
 		return errStyle
 	}
 	if !m.editable(row, col) {
@@ -102,7 +108,7 @@ func (m Model) statusBar() string {
 		line = "» " + m.buffer + "▏   " + m.status
 	}
 	if n := len(m.state.Diagnostics); n > 0 {
-		line = errStyleInline(itoa(n)+" diagnostic(s)") + "  " + line
+		line = errStyleInline(displayText(itoa(displayInt(n))+" diagnostic(s)")) + "  " + line
 	}
 	return statusStyle.Render(line)
 }
@@ -113,21 +119,21 @@ func (m Model) templatePane() string {
 }
 
 // errStyleInline renders an inline error-colored fragment.
-func errStyleInline(s string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Render(s)
+func errStyleInline(s displayText) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Render(string(s))
 }
 
 // clip trims a value to the cell width so the grid stays aligned.
-func clip(s string) string {
+func clip(s displayText) string {
 	runes := []rune(s)
 	if len(runes) <= cellWidth {
-		return s
+		return string(s)
 	}
 	return string(runes[:cellWidth-1]) + "…"
 }
 
 // isErrorValue reports whether a cell value is a spreadsheet error value.
-func isErrorValue(value string) bool {
+func isErrorValue(value displayText) bool {
 	switch sheet.ErrorValue(value) {
 	case sheet.ErrRef, sheet.ErrValue, sheet.ErrName, sheet.ErrDiv:
 		return true
@@ -137,7 +143,7 @@ func isErrorValue(value string) bool {
 }
 
 // columnLabel converts a 0-based column index to spreadsheet letters.
-func columnLabel(index int) string {
+func columnLabel(index cursorPos) string {
 	label := ""
 	for n := index + 1; n > 0; n = (n - 1) / 26 {
 		label = string(rune('A'+(n-1)%26)) + label
@@ -146,7 +152,7 @@ func columnLabel(index int) string {
 }
 
 // itoa renders a non-negative int without importing strconv at each call site.
-func itoa(n int) string {
+func itoa(n displayInt) string {
 	if n == 0 {
 		return "0"
 	}

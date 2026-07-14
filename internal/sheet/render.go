@@ -64,7 +64,7 @@ func renderEndpoint(ep tsvt.Endpoint) string {
 		return "*" + renderRow(ep.(tsvt.RowSelector).Row)
 	}
 	if col, numeric := numericColText(cell.Col); numeric {
-		return renderNumeric(col, cell.Row)
+		return renderNumeric(textVal(col), cell.Row)
 	}
 	return renderCol(cell.Col) + renderRow(cell.Row)
 }
@@ -84,11 +84,11 @@ func numericColText(col tsvt.Col) (string, bool) {
 
 // renderNumeric reconstructs a numeric `[col,row]` reference; a nil row omits
 // the comma (`[3]`).
-func renderNumeric(col string, row tsvt.RowRef) string {
+func renderNumeric(col textVal, row tsvt.RowRef) string {
 	if row == nil {
-		return "[" + col + "]"
+		return "[" + string(col) + "]"
 	}
-	return "[" + col + "," + renderNumericRow(row) + "]"
+	return "[" + string(col) + "," + renderNumericRow(row) + "]"
 }
 
 // renderNumericRow reconstructs the row part of a numeric reference, where a
@@ -107,7 +107,7 @@ func renderNumericRow(row tsvt.RowRef) string {
 func renderCol(col tsvt.Col) string {
 	switch c := col.(type) {
 	case tsvt.ColLetters:
-		return absMark(c.Abs) + c.Name
+		return absMark(boolResult(c.IsAbs)) + c.Name
 	case tsvt.ColLast:
 		return "$"
 	case tsvt.ColNamed:
@@ -118,8 +118,8 @@ func renderCol(col tsvt.Col) string {
 }
 
 // absMark renders the `$` absolute-column prefix.
-func absMark(abs bool) string {
-	if abs {
+func absMark(isAbs boolResult) string {
+	if isAbs {
 		return "$"
 	}
 	return ""
@@ -135,7 +135,7 @@ func renderRow(row tsvt.RowRef) string {
 	case tsvt.RowAll:
 		return "*"
 	case tsvt.RowLast:
-		return "$" + offsetMark(r.Offset)
+		return "$" + offsetMark(offsetVal(r.Offset))
 	case tsvt.RowAbs:
 		return "$" + strconv.Itoa(r.N)
 	default: // nil (a from-end row appears only in numeric refs, rendered there)
@@ -144,12 +144,12 @@ func renderRow(row tsvt.RowRef) string {
 }
 
 // offsetMark renders a last-row offset suffix (`+1`, `-1`, or empty for 0).
-func offsetMark(offset int) string {
+func offsetMark(offset offsetVal) string {
 	if offset > 0 {
-		return "+" + strconv.Itoa(offset)
+		return "+" + strconv.Itoa(int(offset))
 	}
 	if offset < 0 {
-		return strconv.Itoa(offset)
+		return strconv.Itoa(int(offset))
 	}
 	return ""
 }

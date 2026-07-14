@@ -107,7 +107,7 @@ func TestEditDataCell(t *testing.T) {
 
 	state := m.state
 	assert.Equal(t, "9", state.Data[0][0])
-	assert.True(t, state.Dirty)
+	assert.True(t, state.IsDirty)
 }
 
 func TestEditDataCell_Space(t *testing.T) {
@@ -204,11 +204,11 @@ func TestSave(t *testing.T) {
 	m = press(t, m, "enter") // dirty it
 	m = press(t, m, "9")
 	m = press(t, m, "enter")
-	require.True(t, m.state.Dirty)
+	require.True(t, m.state.IsDirty)
 
 	m = press(t, m, "ctrl+s")
 	assert.True(t, saved)
-	assert.False(t, m.state.Dirty)
+	assert.False(t, m.state.IsDirty)
 	assert.Contains(t, m.status, "Saved")
 }
 
@@ -231,7 +231,7 @@ func TestQuit_Clean(t *testing.T) {
 
 	m := newModel(t, nil)
 	next, cmd := m.Update(keyMsg("q"))
-	assert.True(t, next.(Model).quitting)
+	assert.True(t, next.(Model).isQuitting)
 	assert.NotNil(t, cmd) // tea.Quit
 }
 
@@ -244,12 +244,12 @@ func TestQuit_DirtyWarnsThenQuits(t *testing.T) {
 	m = press(t, m, "enter") // dirty
 
 	m = press(t, m, "q") // first q → warn
-	assert.False(t, m.quitting)
-	assert.True(t, m.confirmQuit)
+	assert.False(t, m.isQuitting)
+	assert.True(t, m.isConfirmingQuit)
 	assert.Contains(t, m.status, "Unsaved")
 
 	next, cmd := m.Update(keyMsg("q")) // second q → quit
-	assert.True(t, next.(Model).quitting)
+	assert.True(t, next.(Model).isQuitting)
 	assert.NotNil(t, cmd)
 }
 
@@ -262,17 +262,18 @@ func TestQuit_DirtyThenOtherKeyResets(t *testing.T) {
 	m = press(t, m, "enter")
 	m = press(t, m, "q")    // warn
 	m = press(t, m, "down") // movement resets confirm
-	assert.False(t, m.confirmQuit)
+	assert.False(t, m.isConfirmingQuit)
 
-	m = newModel(t, nil)
-	m = press(t, m, "q") // clean, quits — restart for the command-reset path
+	// A clean model quits immediately on q (no confirm needed).
+	assert.True(t, press(t, newModel(t, nil), "q").isQuitting)
+
 	m = newModel(t, nil)
 	m = press(t, m, "enter")
 	m = press(t, m, "9")
 	m = press(t, m, "enter")
 	m = press(t, m, "q")      // warn
 	m = press(t, m, "ctrl+c") // ctrl+c after warn → quits
-	assert.True(t, m.quitting)
+	assert.True(t, m.isQuitting)
 }
 
 func TestUnhandledKeyResetsConfirm(t *testing.T) {
@@ -280,7 +281,7 @@ func TestUnhandledKeyResetsConfirm(t *testing.T) {
 
 	m := newModel(t, nil)
 	m = press(t, m, "z") // unknown nav key
-	assert.False(t, m.confirmQuit)
+	assert.False(t, m.isConfirmingQuit)
 	assert.Equal(t, modeNav, m.mode)
 }
 

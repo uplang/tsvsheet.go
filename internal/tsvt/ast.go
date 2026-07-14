@@ -195,11 +195,11 @@ type RowSelector struct {
 // Col is a column reference (§5.1). The set is sealed.
 type Col interface{ isCol() }
 
-// ColLetters is a spreadsheet-style column: `A`, `AA`; Abs marks `$B`.
+// ColLetters is a spreadsheet-style column: `A`, `AA`; IsAbs marks `$B`.
 type ColLetters struct {
 	colMarker
-	Name string
-	Abs  bool
+	Name  string
+	IsAbs bool
 }
 
 // ColLast is `$`: the last column.

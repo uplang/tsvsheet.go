@@ -13,8 +13,12 @@ type tuiConfig struct {
 // tuiCommand builds the `tui` command.
 func tuiCommand() *cli.Command {
 	cfg := tuiConfig{}
+	tmpl := buildTemplateFlag()
+	tmpl.Destination = (*string)(&cfg.template)
+	data := buildDataFlag()
+	data.Destination = (*string)(&cfg.data)
 	return &cli.Command{
-		Name:      "tui",
+		Name:      cmdTUI,
 		Usage:     "Edit a worksheet in a terminal UI.",
 		ArgsUsage: " ",
 		Description: `Open the worksheet in a terminal spreadsheet: navigate the computed grid,
@@ -23,7 +27,7 @@ as the browser editor, driven by the same engine.
 
 Examples:
   tsvsheet tui --template sheet.tsvt --data sheet.tsv`,
-		Flags:  sourceFlags(&cfg.template, &cfg.data),
+		Flags:  []cli.Flag{tmpl, data},
 		Action: streamAction(func(s Streams) error { return runTUI(s, cfg) }),
 	}
 }

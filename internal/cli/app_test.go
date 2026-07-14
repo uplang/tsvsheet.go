@@ -45,7 +45,7 @@ func TestCommand_HasAllCommands(t *testing.T) {
 	for i, c := range cmd.Commands {
 		names[i] = c.Name
 	}
-	assert.ElementsMatch(t, []string{"render", "parse", "check", "explain", "serve", "tui"}, names)
+	assert.ElementsMatch(t, []string{cmdRender, cmdParse, cmdCheck, cmdExplain, cmdServe, cmdTUI}, names)
 }
 
 func TestCLI_Render(t *testing.T) {
@@ -67,7 +67,7 @@ func TestCLI_Parse(t *testing.T) {
 
 func TestCLI_CheckClean(t *testing.T) {
 	withStdin(t, "=body\nE=C + D\n")
-	_, err := runCLI(t, "check")
+	_, err := runCLI(t, cmdCheck)
 	require.NoError(t, err)
 }
 
@@ -99,7 +99,7 @@ func TestRun_ExitCodes(t *testing.T) {
 	t.Cleanup(func() { stderr = prevStderr })
 
 	withStdin(t, "=sum(")
-	assert.Equal(t, exitSyntaxError, Run(context.Background(), []string{name, "check"}))
+	assert.Equal(t, exitSyntaxError, Run(context.Background(), "test", []string{name, cmdCheck}))
 }
 
 func TestConfigureLogger(t *testing.T) {

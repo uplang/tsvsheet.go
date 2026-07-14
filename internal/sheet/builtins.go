@@ -8,7 +8,7 @@ import (
 // numerics collects the numeric operands of an aggregate: empty cells are
 // excluded (ADR 0003 rule 8), an error operand short-circuits (rule 3, ok
 // false), and a non-numeric string is #VALUE!.
-func numerics(args []Value) (nums []float64, bad Value, ok bool) {
+func numerics(args []Value) (nums []float64, bad Value, isOK bool) {
 	for _, arg := range args {
 		if arg.kind == kindEmpty {
 			continue
@@ -32,7 +32,7 @@ func fnSum(args []Value) Value {
 	for _, n := range nums {
 		total += n
 	}
-	return numberValue(total)
+	return numberValue(floatVal(total))
 }
 
 // fnMin is the least numeric operand; an empty set is #VALUE!.
@@ -59,7 +59,7 @@ func extreme(args []Value, pick func(a, b float64) float64) Value {
 	for _, n := range nums[1:] {
 		best = pick(best, n)
 	}
-	return numberValue(best)
+	return numberValue(floatVal(best))
 }
 
 // fnCount counts the non-empty operands; an error operand propagates (rule 3).
@@ -73,7 +73,7 @@ func fnCount(args []Value) Value {
 			count++
 		}
 	}
-	return numberValue(float64(count))
+	return numberValue(floatVal(count))
 }
 
 // fnAvg is the mean of the numeric operands; an empty set is #DIV/0!.
@@ -89,7 +89,7 @@ func fnAvg(args []Value) Value {
 	for _, n := range nums {
 		total += n
 	}
-	return numberValue(total / float64(len(nums)))
+	return numberValue(floatVal(total / float64(len(nums))))
 }
 
 // fnAbs is the absolute value of a single numeric operand; a wrong arity is
@@ -102,7 +102,7 @@ func fnAbs(args []Value) Value {
 	if v.isError() {
 		return v
 	}
-	return numberValue(math.Abs(n))
+	return numberValue(floatVal(math.Abs(n)))
 }
 
 // fnRound rounds its first operand to the integer place count of its second
@@ -119,11 +119,11 @@ func fnRound(args []Value) Value {
 	if !ok {
 		return bad
 	}
-	return numberValue(round(n, places))
+	return numberValue(floatVal(round(floatVal(n), places)))
 }
 
 // roundPlaces reads the optional second argument as the decimal place count.
-func roundPlaces(args []Value) (places int, bad Value, ok bool) {
+func roundPlaces(args []Value) (places decimalPlaces, bad Value, isOK bool) {
 	if len(args) < 2 {
 		return 0, Value{}, true
 	}
@@ -131,7 +131,7 @@ func roundPlaces(args []Value) (places int, bad Value, ok bool) {
 	if v.isError() {
 		return 0, v, false
 	}
-	return int(p), Value{}, true
+	return decimalPlaces(p), Value{}, true
 }
 
 // fnConcat joins the string forms of its operands; an error operand propagates.
@@ -141,9 +141,9 @@ func fnConcat(args []Value) Value {
 		if arg.isError() {
 			return arg
 		}
-		b.WriteString(arg.String())
+		_, _ = b.WriteString(arg.String())
 	}
-	return stringValue(b.String())
+	return stringValue(textVal(b.String()))
 }
 
 // fnLen is the length of a single operand's string form; a wrong arity is
@@ -155,5 +155,5 @@ func fnLen(args []Value) Value {
 	if args[0].isError() {
 		return args[0]
 	}
-	return numberValue(float64(len(args[0].String())))
+	return numberValue(floatVal(len(args[0].String())))
 }

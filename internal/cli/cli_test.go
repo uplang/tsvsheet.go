@@ -167,7 +167,7 @@ func TestRunExplain_JSON(t *testing.T) {
 
 	dataPath := writeTemp(t, "d.tsv", sampleData)
 	streams, out, _ := streamsWith("=body\nE=C + D\n")
-	err := runExplain(streams, explainConfig{template: "-", data: sourcePath(dataPath), cell: "E2", asJSON: true})
+	err := runExplain(streams, explainConfig{template: "-", data: sourcePath(dataPath), cell: "E2", isJSON: true})
 	require.NoError(t, err)
 	assert.Contains(t, out.String(), `"cell": "E2"`)
 	assert.Contains(t, out.String(), `"formula": "C + D"`)
@@ -178,7 +178,7 @@ func TestRunExplain_PlainCellNoFormula(t *testing.T) {
 
 	dataPath := writeTemp(t, "d.tsv", sampleData)
 	streams, out, _ := streamsWith("=body\nE=C\n")
-	err := runExplain(streams, explainConfig{template: "-", data: sourcePath(dataPath), cell: "A1", asJSON: true})
+	err := runExplain(streams, explainConfig{template: "-", data: sourcePath(dataPath), cell: "A1", isJSON: true})
 	require.NoError(t, err)
 	assert.Contains(t, out.String(), `"value": "1"`)
 }
@@ -226,7 +226,7 @@ func TestRunExplain_WriteError(t *testing.T) {
 
 	dataPath := writeTemp(t, "d.tsv", sampleData)
 	streams := Streams{In: strings.NewReader("=body\nE=C\n"), Out: failWriter{}, Err: &bytes.Buffer{}}
-	err := runExplain(streams, explainConfig{template: "-", data: sourcePath(dataPath), cell: "A1", asJSON: true})
+	err := runExplain(streams, explainConfig{template: "-", data: sourcePath(dataPath), cell: "A1", isJSON: true})
 	require.Error(t, err)
 }
 

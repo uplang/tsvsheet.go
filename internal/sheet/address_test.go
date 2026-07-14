@@ -24,7 +24,7 @@ func TestParseAddress(t *testing.T) {
 	for src, want := range cases {
 		t.Run(src, func(t *testing.T) {
 			t.Parallel()
-			got, err := sheet.ParseAddress(src)
+			got, err := sheet.ParseAddress(sheet.AddressText(src))
 			require.NoError(t, err)
 			assert.Equal(t, want, got)
 		})
@@ -45,7 +45,7 @@ func TestParseAddress_Invalid(t *testing.T) {
 	for name, src := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := sheet.ParseAddress(src)
+			_, err := sheet.ParseAddress(sheet.AddressText(src))
 			require.Error(t, err)
 			assert.ErrorIs(t, err, constants.ErrInvalidValue)
 		})
@@ -74,7 +74,7 @@ func TestAddress_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	for _, s := range []string{"A1", "Z26", "AA100", "ZZ1", "AAA5"} {
-		addr, err := sheet.ParseAddress(s)
+		addr, err := sheet.ParseAddress(sheet.AddressText(s))
 		require.NoError(t, err)
 		assert.Equal(t, s, addr.String())
 	}

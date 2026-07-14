@@ -35,15 +35,15 @@ func Explain(t tsvt.Template, g Grid, at Address) (Trace, error) {
 	if !ok {
 		return Trace{}, constants.ErrNotFound.With(nil, "cell", at.String())
 	}
-	return newTrace(t, g, out, at, raw), nil
+	return newTrace(t, g, out, at, textVal(raw)), nil
 }
 
 // newTrace assembles the trace for an in-grid cell, attaching a producing
 // formula and its inputs when one is found.
-func newTrace(t tsvt.Template, g, out Grid, at Address, raw string) Trace {
-	trace := Trace{Cell: at, Value: raw}
+func newTrace(t tsvt.Template, g, out Grid, at Address, raw textVal) Trace {
+	trace := Trace{Cell: at, Value: string(raw)}
 	phases := partition(t)
-	comp := &computation{grid: out, names: map[string]int{}, width: out.cols()}
+	comp := computation{state: &computeState{grid: out, names: map[string]int{}, width: out.cols()}}
 	comp.bindHeaders(phases.header)
 	expr, evalRow, found := comp.producing(phases, at, g.rows())
 	if !found {
@@ -57,7 +57,7 @@ func newTrace(t tsvt.Template, g, out Grid, at Address, raw string) Trace {
 // producing finds the formula that last wrote the target cell: a body formula
 // for a data row, or a final placement at the exact cell. dataRows is the
 // original data-row count (body rows).
-func (c *computation) producing(p phase, at Address, dataRows int) (tsvt.Expr, int, bool) {
+func (c computation) producing(p phase, at Address, dataRows int) (tsvt.Expr, int, bool) {
 	var (
 		found tsvt.Expr
 		row   int
@@ -74,13 +74,13 @@ func (c *computation) producing(p phase, at Address, dataRows int) (tsvt.Expr, i
 
 // scanBody returns the last body formula whose column matches at, evaluated at
 // at.Row.
-func (c *computation) scanBody(lines []tsvt.Line, at Address) (tsvt.Expr, int, bool) {
+func (c computation) scanBody(lines []tsvt.Line, at Address) (tsvt.Expr, int, bool) {
 	var (
 		found tsvt.Expr
 		ok    bool
 	)
 	for _, line := range lines {
-		if e, hit := c.lineFormula(line, at.Col, at.Row, at.Row); hit {
+		if e, hit := c.lineFormula(line, at.Col, at.Row); hit {
 			found, ok = e, true
 		}
 	}
@@ -88,7 +88,7 @@ func (c *computation) scanBody(lines []tsvt.Line, at Address) (tsvt.Expr, int, b
 }
 
 // scanFinal returns the last final formula whose exact cell matches at.
-func (c *computation) scanFinal(lines []tsvt.Line, at Address) (tsvt.Expr, int, bool) {
+func (c computation) scanFinal(lines []tsvt.Line, at Address) (tsvt.Expr, int, bool) {
 	var (
 		found tsvt.Expr
 		ok    bool
@@ -109,7 +109,7 @@ func asRow(line tsvt.Line) (tsvt.Row, bool) {
 }
 
 // lineFormula returns a body row's formula targeting column col at dataRow.
-func (c *computation) lineFormula(line tsvt.Line, col, dataRow, evalRow int) (tsvt.Expr, bool) {
+func (c computation) lineFormula(line tsvt.Line, col, dataRow int) (tsvt.Expr, bool) {
 	row, ok := asRow(line)
 	if !ok {
 		return nil, false
@@ -124,7 +124,7 @@ func (c *computation) lineFormula(line tsvt.Line, col, dataRow, evalRow int) (ts
 
 // lineFinalFormula returns a final row's placement formula targeting the exact
 // address at.
-func (c *computation) lineFinalFormula(line tsvt.Line, at Address) (tsvt.Expr, bool) {
+func (c computation) lineFinalFormula(line tsvt.Line, at Address) (tsvt.Expr, bool) {
 	row, ok := asRow(line)
 	if !ok {
 		return nil, false
@@ -139,7 +139,7 @@ func (c *computation) lineFinalFormula(line tsvt.Line, at Address) (tsvt.Expr, b
 
 // finalPlacementFormula returns a placement's formula when it targets the exact
 // address at (final phase, no current row).
-func (c *computation) finalPlacementFormula(cell tsvt.Cell, at Address) (tsvt.Expr, bool) {
+func (c computation) finalPlacementFormula(cell tsvt.Cell, at Address) (tsvt.Expr, bool) {
 	placement, ok := cell.(tsvt.PlacementCell)
 	if !ok {
 		return nil, false
@@ -156,7 +156,7 @@ func (c *computation) finalPlacementFormula(cell tsvt.Cell, at Address) (tsvt.Ex
 }
 
 // cellFormula returns a cell's formula expression, if it has one.
-func (c *computation) cellFormula(cell tsvt.Cell) (tsvt.Expr, bool) {
+func (c computation) cellFormula(cell tsvt.Cell) (tsvt.Expr, bool) {
 	switch cl := cell.(type) {
 	case tsvt.FormulaCell:
 		return cl.Expr, true
@@ -170,7 +170,7 @@ func (c *computation) cellFormula(cell tsvt.Cell) (tsvt.Expr, bool) {
 
 // cellCol returns the column a cell targets: a positional cell its field index,
 // a placement its resolved column (-1 when unresolvable).
-func (c *computation) cellCol(cell tsvt.Cell, field, dataRow int) int {
+func (c computation) cellCol(cell tsvt.Cell, field, dataRow int) int {
 	placement, ok := cell.(tsvt.PlacementCell)
 	if !ok {
 		return field
@@ -184,7 +184,7 @@ func (c *computation) cellCol(cell tsvt.Cell, field, dataRow int) int {
 
 // traceInputs renders each reference operand in expr with its resolved value at
 // the given row.
-func (c *computation) traceInputs(expr tsvt.Expr, evalRow int) []TraceInput {
+func (c computation) traceInputs(expr tsvt.Expr, evalRow int) []TraceInput {
 	res := c.resolverAt(evalRow)
 	var inputs []TraceInput
 	walkRefs(expr, func(ref tsvt.Reference) {

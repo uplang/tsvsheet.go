@@ -37,7 +37,7 @@ func runCheck(streams Streams, cfg checkConfig) error {
 // any are present.
 func reportDiagnostics(w io.Writer, diags []sheet.Diagnostic) error {
 	for _, d := range diags {
-		fmt.Fprintf(w, "line %d: %s\n", d.Line, d.Message)
+		_, _ = fmt.Fprintf(w, "line %d: %s\n", d.Line, d.Message)
 	}
 	if len(diags) > 0 {
 		return constants.ErrDiagnostics.With(nil, "count", len(diags))
@@ -55,8 +55,10 @@ func isDiagnostics(err error) bool { return errors.Is(err, constants.ErrDiagnost
 // checkCommand builds the `check` command.
 func checkCommand() *cli.Command {
 	cfg := checkConfig{}
+	tmpl := buildTemplateFlag()
+	tmpl.Destination = (*string)(&cfg.template)
 	return &cli.Command{
-		Name:      "check",
+		Name:      cmdCheck,
 		Usage:     "Validate a template and report diagnostics.",
 		ArgsUsage: " ",
 		Description: `Parse and statically check a .tsvt template. Diagnostics are written one per
@@ -65,7 +67,7 @@ line to stderr. Exit status: 0 clean, 1 diagnostics found, 2 syntax error.
 Examples:
   tsvsheet check --template sheet.tsvt
   cat sheet.tsvt | tsvsheet check`,
-		Flags:  templateFlagOnly(&cfg.template),
+		Flags:  []cli.Flag{tmpl},
 		Action: streamAction(func(s Streams) error { return runCheck(s, cfg) }),
 	}
 }

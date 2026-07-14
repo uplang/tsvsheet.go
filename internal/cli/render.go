@@ -32,8 +32,12 @@ func runRender(streams Streams, cfg renderConfig) error {
 // renderCommand builds the `render` command.
 func renderCommand() *cli.Command {
 	cfg := renderConfig{}
+	tmpl := buildTemplateFlag()
+	tmpl.Destination = (*string)(&cfg.template)
+	data := buildDataFlag()
+	data.Destination = (*string)(&cfg.data)
 	return &cli.Command{
-		Name:      "render",
+		Name:      cmdRender,
 		Usage:     "Compute a worksheet and write the result as TSV.",
 		ArgsUsage: " ",
 		Description: `Compute a .tsvt template against a .tsv data grid and write the computed
@@ -46,7 +50,7 @@ Examples:
   tsvsheet render --template sheet.tsvt --data sheet.tsv
   cat sheet.tsvt | tsvsheet render --data sheet.tsv
   tsvsheet render --template sheet.tsvt < sheet.tsv`,
-		Flags:  sourceFlags(&cfg.template, &cfg.data),
+		Flags:  []cli.Flag{tmpl, data},
 		Action: streamAction(func(s Streams) error { return runRender(s, cfg) }),
 	}
 }

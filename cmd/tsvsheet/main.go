@@ -21,6 +21,5 @@ func main() { osExit(run(os.Args)) }
 // process exit code. Keeping the logic here (rather than in main) makes the
 // whole entry path testable.
 func run(args []string) int {
-	cli.Version = version
-	return cli.Run(context.Background(), args)
+	return cli.Run(context.Background(), cli.Version(version), args)
 }

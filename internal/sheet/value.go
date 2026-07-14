@@ -39,10 +39,10 @@ type Value struct {
 func emptyValue() Value { return Value{kind: kindEmpty} }
 
 // numberValue wraps a float result.
-func numberValue(n float64) Value { return Value{kind: kindNumber, num: n} }
+func numberValue(n floatVal) Value { return Value{kind: kindNumber, num: float64(n)} }
 
 // stringValue wraps a text result.
-func stringValue(s string) Value { return Value{kind: kindString, str: s} }
+func stringValue(s textVal) Value { return Value{kind: kindString, str: string(s)} }
 
 // errorValue wraps an error value.
 func errorValue(e ErrorValue) Value { return Value{kind: kindError, str: string(e)} }
@@ -50,21 +50,21 @@ func errorValue(e ErrorValue) Value { return Value{kind: kindError, str: string(
 // value parses a raw cell string into a Value: empty stays empty, a numeric
 // string becomes a number, a recognized error code round-trips as an error, and
 // anything else is a string.
-func value(raw string) Value {
+func value(raw textVal) Value {
 	if raw == "" {
 		return emptyValue()
 	}
-	if n, err := strconv.ParseFloat(raw, 64); err == nil {
-		return numberValue(n)
+	if n, err := strconv.ParseFloat(string(raw), 64); err == nil {
+		return numberValue(floatVal(n))
 	}
 	if isErrorCode(raw) {
-		return Value{kind: kindError, str: raw}
+		return Value{kind: kindError, str: string(raw)}
 	}
 	return stringValue(raw)
 }
 
 // isErrorCode reports whether raw is one of the four error values.
-func isErrorCode(raw string) bool {
+func isErrorCode(raw textVal) bool {
 	switch ErrorValue(raw) {
 	case ErrRef, ErrValue, ErrName, ErrDiv:
 		return true
@@ -123,7 +123,7 @@ func (v Value) truthy() (bool, Value) {
 }
 
 // round rounds half away from zero to the given number of decimal places.
-func round(n float64, places int) float64 {
+func round(n floatVal, places decimalPlaces) float64 {
 	scale := math.Pow(10, float64(places))
-	return math.Round(n*scale) / scale
+	return math.Round(float64(n)*scale) / scale
 }

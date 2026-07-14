@@ -136,7 +136,7 @@ func TestExplain_UnaryAndNumberAndLiteral(t *testing.T) {
 	// A unary formula with a numeric literal exercises renderExpr's unary and
 	// number branches and walkRefs' unary branch. A preceding literal cell (no
 	// formula) exercises cellFormula's non-formula branch.
-	trace := explain(t, "=body\nY=Tag\tZ=0 - C", fixedData, "Z2")
+	trace := explain(t, "=body\nY=Tag\tZ=0 - C", "Z2")
 	assert.Equal(t, "0 - C", trace.Formula)
 	require.Len(t, trace.Inputs, 1)
 	assert.Equal(t, "C", trace.Inputs[0].Ref)
@@ -146,7 +146,7 @@ func TestExplain_UnaryOperand(t *testing.T) {
 	t.Parallel()
 
 	// -C exercises the unary render/walk path directly.
-	trace := explain(t, "=body\nZ=0 - abs(C)", fixedData, "Z2")
+	trace := explain(t, "=body\nZ=0 - abs(C)", "Z2")
 	assert.Contains(t, trace.Formula, "abs(C)")
 }
 
@@ -157,7 +157,7 @@ func TestExplain_FinalLiteralPayloadAndMismatch(t *testing.T) {
 	// placement (not a formula) exercise finalPlacementFormula's non-placement
 	// and non-formula branches; an absolute-row formula placement is matched
 	// (an absolute row is stable across the appended row, unlike `$`).
-	trace := explain(t, "=final\n=99 + A\nA$+1=Tag\nC$3=sum(C$1:C$3)", fixedData, "C3")
+	trace := explain(t, "=final\n=99 + A\nA$+1=Tag\nC$3=sum(C$1:C$3)", "C3")
 	assert.Equal(t, "sum(C$1:C$3)", trace.Formula)
 }
 
@@ -166,7 +166,7 @@ func TestExplain_BodyWithStructural(t *testing.T) {
 
 	// A structural command in the body section is skipped by the body formula
 	// lookup (asRow false); the addressed formula still produces the cell.
-	trace := explain(t, "=body\n=$>\nZ=A", fixedData, "Z1")
+	trace := explain(t, "=body\n=$>\nZ=A", "Z1")
 	assert.Equal(t, "A", trace.Formula)
 }
 
@@ -176,7 +176,7 @@ func TestExplain_CellColUnresolvable(t *testing.T) {
 	// A body placement whose target column is an unbound named column resolves
 	// to no column (-1) in the producing-formula scan; explaining a different
 	// cell still succeeds.
-	trace := explain(t, "=body\n\"Missing\"=C\nZ=D", fixedData, "Z1")
+	trace := explain(t, "=body\n\"Missing\"=C\nZ=D", "Z1")
 	assert.Equal(t, "D", trace.Formula)
 }
 
@@ -185,7 +185,7 @@ func TestExplain_PositionalFormulaProducer(t *testing.T) {
 
 	// A positional formula at field 0 targets column A; explaining A1 finds it
 	// (exercises cellCol's positional branch and cellFormula on a formula cell).
-	trace := explain(t, "=body\n=D", fixedData, "A1")
+	trace := explain(t, "=body\n=D", "A1")
 	assert.Equal(t, "D", trace.Formula)
 }
 
@@ -194,7 +194,7 @@ func TestExplain_LiteralCellSkippedInScan(t *testing.T) {
 
 	// A positional literal cell has no formula; the scan skips it (cellFormula
 	// default branch) and finds the addressed formula.
-	trace := explain(t, "=body\nTag\tZ=A", fixedData, "Z1")
+	trace := explain(t, "=body\nTag\tZ=A", "Z1")
 	assert.Equal(t, "A", trace.Formula)
 }
 
@@ -204,7 +204,7 @@ func TestExplain_UnaryRenderAndWalk(t *testing.T) {
 	// A unary formula exercises renderExpr's unary branch and walkRefs' unary
 	// branch; the numeric operand exercises walkRefs' no-op and renderExpr's
 	// number branch.
-	trace := explain(t, "=body\nZ=-C\nY=1 + C", fixedData, "Z2")
+	trace := explain(t, "=body\nZ=-C\nY=1 + C", "Z2")
 	assert.Equal(t, "-C", trace.Formula)
 	require.Len(t, trace.Inputs, 1)
 	assert.Equal(t, "C", trace.Inputs[0].Ref)
@@ -215,7 +215,7 @@ func TestExplain_NumericGroupedRender(t *testing.T) {
 
 	// A numeric grouped range renders its column indices (renderCol's index
 	// branch).
-	trace := explain(t, "=body\nZ=sum(([0]:[2])0)", fixedData, "Z2")
+	trace := explain(t, "=body\nZ=sum(([0]:[2])0)", "Z2")
 	require.Len(t, trace.Inputs, 1)
 	assert.Equal(t, "([0]:[2])0", trace.Inputs[0].Ref)
 }
@@ -258,7 +258,7 @@ func TestExplain_FinalFormulaMismatch(t *testing.T) {
 
 	// Two absolute-row formula placements; explaining C3 skips the A-column
 	// placement (target mismatch) and matches the C-column one.
-	trace := explain(t, "=final\nA$3=sum(A$1:A$3)\nC$3=sum(C$1:C$3)", fixedData, "C3")
+	trace := explain(t, "=final\nA$3=sum(A$1:A$3)\nC$3=sum(C$1:C$3)", "C3")
 	assert.Equal(t, "sum(C$1:C$3)", trace.Formula)
 }
 

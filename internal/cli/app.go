@@ -35,8 +35,19 @@ const (
 	exitSyntaxError = 2
 )
 
-// Version is the build version, set by main (ldflags -X).
-var Version = "dev"
+// command names.
+const (
+	cmdRender  = "render"
+	cmdParse   = "parse"
+	cmdCheck   = "check"
+	cmdExplain = "explain"
+	cmdServe   = "serve"
+	cmdTUI     = "tui"
+)
+
+// Version is a build version string, supplied by main (ldflags -X) and threaded
+// into the command rather than held in a package-level variable.
+type Version string
 
 // loggerConfig holds the global logging flags, bound on the root command.
 var loggerConfig golog.LoggerConfig
@@ -44,12 +55,12 @@ var loggerConfig golog.LoggerConfig
 // Command builds the root tsvsheet command with the given version. A Before
 // hook configures the default structured logger from the global flags so that
 // diagnostics (and the top-level error) log consistently to stderr.
-func Command(v string) *cli.Command {
+func Command(v Version) *cli.Command {
 	return &cli.Command{
 		Name:                  name,
 		Usage:                 usage,
 		Description:           description,
-		Version:               v,
+		Version:               string(v),
 		EnableShellCompletion: true,
 		Before:                configureLogger,
 		Flags:                 loggerFlags(),
@@ -93,8 +104,8 @@ func loggerFlags() []cli.Flag {
 
 // Run builds and runs the CLI, returning the process exit code: 0 success,
 // 2 syntax error, 1 any other error.
-func Run(ctx context.Context, args []string) int {
-	err := Command(Version).Run(ctx, args)
+func Run(ctx context.Context, version Version, args []string) int {
+	err := Command(version).Run(ctx, args)
 	return exitCode(err)
 }
 

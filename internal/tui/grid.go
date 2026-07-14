@@ -42,18 +42,19 @@ func (m Model) editable(row, col int) bool {
 
 // dataValue returns the raw data value at (row, col), or empty when absent.
 func (m Model) dataValue(row, col int) string {
-	return cellAt(m.state.Data, row, col)
+	return cellAt(m.state.Data, cursorPos(row), cursorPos(col))
 }
 
 // computedValue returns the computed value at (row, col), or empty when absent.
 func (m Model) computedValue(row, col int) string {
-	return cellAt(m.state.Computed, row, col)
+	return cellAt(m.state.Computed, cursorPos(row), cursorPos(col))
 }
 
 // cellAt reads a grid cell, returning empty for any out-of-bounds position.
-func cellAt(g [][]string, row, col int) string {
-	if row < 0 || row >= len(g) || col < 0 || col >= len(g[row]) {
+func cellAt(g [][]string, row, col cursorPos) string {
+	r, c := int(row), int(col)
+	if r < 0 || r >= len(g) || c < 0 || c >= len(g[r]) {
 		return ""
 	}
-	return g[row][col]
+	return g[r][c]
 }

@@ -20,20 +20,20 @@ type resolver struct {
 type colRes struct {
 	name  string
 	index int
-	ok    bool
+	isOK  bool
 }
 
 // cellset is a resolved reference as an operand: the resolved cell values and
 // whether it was a single cell (a range/matrix is not single).
 type cellset struct {
-	values []Value
-	single bool
+	values   []Value
+	isSingle bool
 }
 
 // scalar reduces a cellset to one value: a single cell is its value; a
 // multi-cell range used where a scalar is required is #VALUE! (ADR 0003 rule 8).
 func (c cellset) scalar() Value {
-	if c.single && len(c.values) == 1 {
+	if c.isSingle && len(c.values) == 1 {
 		return c.values[0]
 	}
 	return errorValue(ErrValue)
@@ -43,15 +43,15 @@ func (c cellset) scalar() Value {
 func (r resolver) resolveColumn(col tsvt.Col) colRes {
 	switch c := col.(type) {
 	case tsvt.ColLetters:
-		return colRes{index: lettersToIndex(c.Name), ok: true}
+		return colRes{index: lettersToIndex(columnLetters(c.Name)), isOK: true}
 	case tsvt.ColIndex:
-		return colRes{index: normalizeIndex(c.Index, r.width), ok: true}
+		return colRes{index: normalizeIndex(colIndex(c.Index), colIndex(r.width)), isOK: true}
 	case tsvt.ColLast:
-		return colRes{index: r.width - 1, ok: true}
+		return colRes{index: r.width - 1, isOK: true}
 	case tsvt.ColNamed:
 		return r.resolveNamed(c.Name)
 	default: // tsvt.ColElided — invalid as an operand column
-		return colRes{ok: false}
+		return colRes{isOK: false}
 	}
 }
 
@@ -59,18 +59,18 @@ func (r resolver) resolveColumn(col tsvt.Col) colRes {
 // the string-literal fallback.
 func (r resolver) resolveNamed(name string) colRes {
 	if index, found := r.names[name]; found {
-		return colRes{index: index, ok: true}
+		return colRes{index: index, isOK: true}
 	}
 	return colRes{name: name}
 }
 
 // normalizeIndex maps a possibly-negative 0-based index to a concrete column,
 // counting negatives from the end (§5.1).
-func normalizeIndex(index, width int) int {
+func normalizeIndex(index, width colIndex) int {
 	if index < 0 {
-		return width + index
+		return int(width + index)
 	}
-	return index
+	return int(index)
 }
 
 // resolveRow resolves a row reference to a 0-based grid row. ok is false when
@@ -82,9 +82,9 @@ func (r resolver) resolveRow(row tsvt.RowRef) (int, bool) {
 	case nil:
 		return r.row, r.row >= 0
 	case tsvt.RowBefore:
-		return relativeRow(r.row, -ref.N)
+		return relativeRow(rowIndex(r.row), rowIndex(-ref.N))
 	case tsvt.RowAfter:
-		return relativeRow(r.row, ref.N)
+		return relativeRow(rowIndex(r.row), rowIndex(ref.N))
 	case tsvt.RowAbs:
 		return ref.N - 1, true
 	case tsvt.RowLast:
@@ -98,11 +98,11 @@ func (r resolver) resolveRow(row tsvt.RowRef) (int, bool) {
 
 // relativeRow offsets the current row, reporting ok=false when there is no
 // current row (final phase).
-func relativeRow(current, delta int) (int, bool) {
+func relativeRow(current, delta rowIndex) (int, bool) {
 	if current < 0 {
 		return 0, false
 	}
-	return current + delta, true
+	return int(current + delta), true
 }
 
 // resolveOperand resolves a reference for use as an expression operand.
@@ -128,7 +128,7 @@ func (r resolver) resolveRange(ref tsvt.RangeRef) cellset {
 func (r resolver) resolveEndpoint(ep tsvt.Endpoint) cellset {
 	switch e := ep.(type) {
 	case tsvt.CellEndpoint:
-		return cellset{values: []Value{r.resolveCell(e.Col, e.Row)}, single: true}
+		return cellset{values: []Value{r.resolveCell(e.Col, e.Row)}, isSingle: true}
 	default: // tsvt.RowSelector
 		return r.resolveRowSelector(ep.(tsvt.RowSelector))
 	}
@@ -139,9 +139,9 @@ func (r resolver) resolveEndpoint(ep tsvt.Endpoint) cellset {
 // #REF!.
 func (r resolver) resolveCell(col tsvt.Col, row tsvt.RowRef) Value {
 	cr := r.resolveColumn(col)
-	if !cr.ok {
+	if !cr.isOK {
 		if cr.name != "" {
-			return stringValue(cr.name)
+			return stringValue(textVal(cr.name))
 		}
 		return errorValue(ErrRef)
 	}
@@ -158,7 +158,7 @@ func (r resolver) read(row, col int) Value {
 	if !ok {
 		return errorValue(ErrRef)
 	}
-	return value(raw)
+	return value(textVal(raw))
 }
 
 // resolveRowSelector resolves a whole-row reference to that row's cells.
@@ -194,7 +194,7 @@ func (r resolver) corner(ep tsvt.Endpoint) (Address, bool) {
 	}
 	cr := r.resolveColumn(cell.Col)
 	rowIdx, rowOK := r.resolveRow(cell.Row)
-	if !cr.ok || !rowOK {
+	if !cr.isOK || !rowOK {
 		return Address{}, false
 	}
 	return Address{Row: rowIdx, Col: cr.index}, true
@@ -202,8 +202,8 @@ func (r resolver) corner(ep tsvt.Endpoint) (Address, bool) {
 
 // hull reads every cell in the inclusive rectangle spanned by a and b.
 func (r resolver) hull(a, b Address) []Value {
-	r0, r1 := ordered(a.Row, b.Row)
-	c0, c1 := ordered(a.Col, b.Col)
+	r0, r1 := ordered(gridPos(a.Row), gridPos(b.Row))
+	c0, c1 := ordered(gridPos(a.Col), gridPos(b.Col))
 	values := make([]Value, 0, (r1-r0+1)*(c1-c0+1))
 	for row := r0; row <= r1; row++ {
 		for col := c0; col <= c1; col++ {
@@ -214,11 +214,11 @@ func (r resolver) hull(a, b Address) []Value {
 }
 
 // ordered returns its two arguments low-first.
-func ordered(x, y int) (int, int) {
+func ordered(x, y gridPos) (int, int) {
 	if x <= y {
-		return x, y
+		return int(x), int(y)
 	}
-	return y, x
+	return int(y), int(x)
 }
 
 // resolveGrouped resolves a grouped column range with one trailing row applied
@@ -227,7 +227,7 @@ func (r resolver) resolveGrouped(ref tsvt.GroupedRange) cellset {
 	from := r.resolveColumn(ref.FromCol)
 	to := r.resolveColumn(ref.ToCol)
 	rowIdx, rowOK := r.resolveRow(ref.Row)
-	if !from.ok || !to.ok || !rowOK {
+	if !from.isOK || !to.isOK || !rowOK {
 		return cellset{values: []Value{errorValue(ErrRef)}}
 	}
 	return cellset{values: r.groupedCells(from.index, to.index, rowIdx)}
@@ -235,7 +235,7 @@ func (r resolver) resolveGrouped(ref tsvt.GroupedRange) cellset {
 
 // groupedCells reads one row across an inclusive column span.
 func (r resolver) groupedCells(fromCol, toCol, row int) []Value {
-	c0, c1 := ordered(fromCol, toCol)
+	c0, c1 := ordered(gridPos(fromCol), gridPos(toCol))
 	values := make([]Value, 0, c1-c0+1)
 	for col := c0; col <= c1; col++ {
 		values = append(values, r.read(row, col))

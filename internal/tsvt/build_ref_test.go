@@ -32,7 +32,7 @@ func TestRef_Columns(t *testing.T) {
 	cases := map[string]tsvt.Col{
 		"A":     tsvt.ColLetters{Name: "A"},
 		"AA":    tsvt.ColLetters{Name: "AA"},
-		"$B":    tsvt.ColLetters{Name: "B", Abs: true},
+		"$B":    tsvt.ColLetters{Name: "B", IsAbs: true},
 		"$":     tsvt.ColLast{},
 		`"Sum"`: tsvt.ColNamed{Name: "Sum"},
 		"[3]":   tsvt.ColIndex{Index: 3},
@@ -151,7 +151,7 @@ func TestRef_AbsoluteMatrix(t *testing.T) {
 	require.True(t, ok)
 	from, ok := rangeRef.From.(tsvt.CellEndpoint)
 	require.True(t, ok)
-	assert.Equal(t, tsvt.ColLetters{Name: "B", Abs: true}, from.Col)
+	assert.Equal(t, tsvt.ColLetters{Name: "B", IsAbs: true}, from.Col)
 	assert.Equal(t, tsvt.RowAbs{N: 1}, from.Row)
 }
 

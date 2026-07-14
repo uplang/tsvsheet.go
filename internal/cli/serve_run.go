@@ -36,10 +36,10 @@ func runServe(ctx context.Context, cfg serveConfig) error {
 
 // loadServer reads the worksheet files into a session and builds the HTTP
 // server with a saver that writes edits back to those files.
-func loadServer(template, data sourcePath) (*serve.Server, error) {
+func loadServer(template, data sourcePath) (serve.Server, error) {
 	sess, persist, err := loadEditable(template, data)
 	if err != nil {
-		return nil, err
+		return serve.Server{}, err
 	}
 	return serve.NewServer(sess, persist), nil
 }

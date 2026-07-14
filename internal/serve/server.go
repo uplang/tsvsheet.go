@@ -23,13 +23,13 @@ type Server struct {
 }
 
 // NewServer builds a server over a session and a save function.
-func NewServer(s *session.Session, save Saver) *Server {
-	return &Server{session: s, save: save}
+func NewServer(s *session.Session, save Saver) Server {
+	return Server{session: s, save: save}
 }
 
 // Handler returns the HTTP handler: the JSON API under /api/ and the embedded
 // single-page UI at the root.
-func (srv *Server) Handler() http.Handler {
+func (srv Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", srv.handleState)
 	mux.HandleFunc("PUT /api/template", srv.handleTemplate)
@@ -41,7 +41,7 @@ func (srv *Server) Handler() http.Handler {
 }
 
 // handleState returns the current worksheet read model.
-func (srv *Server) handleState(w http.ResponseWriter, _ *http.Request) {
+func (srv Server) handleState(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, srv.session.Snapshot())
 }
 
@@ -52,7 +52,7 @@ type templateRequest struct {
 
 // handleTemplate replaces the template text, returning the new state or 422
 // with the syntax/validation error.
-func (srv *Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
+func (srv Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
 	var req templateRequest
 	if !decode(w, r, &req) {
 		return
@@ -73,7 +73,7 @@ type cellRequest struct {
 }
 
 // handleDataCell edits one raw data cell and returns the new state.
-func (srv *Server) handleDataCell(w http.ResponseWriter, r *http.Request) {
+func (srv Server) handleDataCell(w http.ResponseWriter, r *http.Request) {
 	var req cellRequest
 	if !decode(w, r, &req) {
 		return
@@ -87,22 +87,22 @@ func (srv *Server) handleDataCell(w http.ResponseWriter, r *http.Request) {
 
 // saveResponse is the POST /api/save body.
 type saveResponse struct {
-	Saved bool `json:"saved"`
+	IsSaved bool `json:"saved"`
 }
 
 // handleSave persists the worksheet and clears the dirty flag.
-func (srv *Server) handleSave(w http.ResponseWriter, _ *http.Request) {
+func (srv Server) handleSave(w http.ResponseWriter, _ *http.Request) {
 	if err := srv.save(); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	srv.session.MarkSaved()
-	writeJSON(w, http.StatusOK, saveResponse{Saved: true})
+	writeJSON(w, http.StatusOK, saveResponse{IsSaved: true})
 }
 
 // handleExplain traces one computed cell named by the `cell` query parameter.
-func (srv *Server) handleExplain(w http.ResponseWriter, r *http.Request) {
-	at, err := sheet.ParseAddress(r.URL.Query().Get("cell"))
+func (srv Server) handleExplain(w http.ResponseWriter, r *http.Request) {
+	at, err := sheet.ParseAddress(sheet.AddressText(r.URL.Query().Get("cell")))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -130,14 +130,17 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+// statusCode is an HTTP response status.
+type statusCode int
+
 // writeError writes a JSON error envelope with the given status.
-func writeError(w http.ResponseWriter, status int, err error) {
+func writeError(w http.ResponseWriter, status statusCode, err error) {
 	writeJSON(w, status, errorResponse{Error: err.Error()})
 }
 
 // writeJSON encodes v as JSON with the given status.
-func writeJSON(w http.ResponseWriter, status int, v any) {
+func writeJSON(w http.ResponseWriter, status statusCode, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
+	w.WriteHeader(int(status))
 	_ = json.NewEncoder(w).Encode(v)
 }

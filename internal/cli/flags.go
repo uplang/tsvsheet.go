@@ -21,38 +21,25 @@ const (
 	cellFlag     = "cell"
 )
 
-// sourceFlags builds the shared --template/--data path flags bound to the given
-// source paths.
-func sourceFlags(template, data *sourcePath) []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{
-			Name:        templateFlag,
-			Aliases:     []string{"t"},
-			Sources:     cli.EnvVars("TSVSHEET_TEMPLATE"),
-			Usage:       "Template .tsvt path ('-' or omitted = stdin)",
-			Destination: (*string)(template),
-		},
-		&cli.StringFlag{
-			Name:        dataFlag,
-			Aliases:     []string{"d"},
-			Sources:     cli.EnvVars("TSVSHEET_DATA"),
-			Usage:       "Data .tsv path ('-' or omitted = stdin)",
-			Destination: (*string)(data),
-		},
+// buildTemplateFlag builds the --template path flag with its destination unset;
+// each command wires the destination to its own config field, so no pointer is
+// passed across a call boundary.
+func buildTemplateFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:    templateFlag,
+		Aliases: []string{"t"},
+		Sources: cli.EnvVars("TSVSHEET_TEMPLATE"),
+		Usage:   "Template .tsvt path ('-' or omitted = stdin)",
 	}
 }
 
-// templateFlagOnly builds just the --template flag for commands that need no
-// data grid (parse, check).
-func templateFlagOnly(template *sourcePath) []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{
-			Name:        templateFlag,
-			Aliases:     []string{"t"},
-			Sources:     cli.EnvVars("TSVSHEET_TEMPLATE"),
-			Usage:       "Template .tsvt path ('-' or omitted = stdin)",
-			Destination: (*string)(template),
-		},
+// buildDataFlag builds the --data path flag with its destination unset.
+func buildDataFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:    dataFlag,
+		Aliases: []string{"d"},
+		Sources: cli.EnvVars("TSVSHEET_DATA"),
+		Usage:   "Data .tsv path ('-' or omitted = stdin)",
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 type Diagnostic struct {
 	Message string          `json:"message"`
 	Line    tsvt.LineNumber `json:"line"`
-	Fatal   bool            `json:"fatal"`
+	IsFatal bool            `json:"fatal"`
 }
 
 // err renders a fatal diagnostic as its sentinel error.
@@ -25,7 +25,7 @@ func (d Diagnostic) err() error {
 // (ADR 0003 rules 7, 18) as fatal, unknown function names (rule 10) as
 // advisory. It needs no data grid.
 func Check(t tsvt.Template) []Diagnostic {
-	var diags []Diagnostic
+	diags := make([]Diagnostic, 0, len(t.Lines))
 	for _, line := range t.Lines {
 		diags = append(diags, checkLine(line)...)
 	}
@@ -49,7 +49,7 @@ func checkLine(line tsvt.Line) []Diagnostic {
 func checkStructural(cmd tsvt.Structural) []Diagnostic {
 	if !isBareColumn(cmd.Ref) {
 		const msg = "structural command requires a single column (§6 range/cell scope is open)"
-		return []Diagnostic{{Line: cmd.At, Message: msg, Fatal: true}}
+		return []Diagnostic{{Line: cmd.At, Message: msg, IsFatal: true}}
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func isBareColumn(ref tsvt.Reference) bool {
 // checkRow collects diagnostics for a cell row: a per-cell structural modifier
 // (rule 18) is fatal; unknown functions in any formula are advisory.
 func checkRow(row tsvt.Row) []Diagnostic {
-	var diags []Diagnostic
+	diags := make([]Diagnostic, 0, len(row.Cells))
 	for _, cell := range row.Cells {
 		diags = append(diags, checkCell(cell, row.At)...)
 	}
@@ -87,7 +87,7 @@ func checkCell(cell tsvt.Cell, at tsvt.LineNumber) []Diagnostic {
 // formula for unknown functions.
 func checkPlacement(cell tsvt.PlacementCell, at tsvt.LineNumber) []Diagnostic {
 	if cell.Mod != tsvt.ModNone {
-		return []Diagnostic{{Line: at, Message: "per-cell structural modifier is unsupported (§6 open)", Fatal: true}}
+		return []Diagnostic{{Line: at, Message: "per-cell structural modifier is unsupported (§6 open)", IsFatal: true}}
 	}
 	if formula, ok := cell.Payload.(tsvt.FormulaPayload); ok {
 		return unknownFuncs(formula.Expr, at)
@@ -100,7 +100,7 @@ func checkPlacement(cell tsvt.PlacementCell, at tsvt.LineNumber) []Diagnostic {
 func unknownFuncs(expr tsvt.Expr, at tsvt.LineNumber) []Diagnostic {
 	var diags []Diagnostic
 	walkExpr(expr, func(call tsvt.Call) {
-		if !isKnownFunc(call.Name) {
+		if !isKnownFunc(funcName(call.Name)) {
 			diags = append(diags, Diagnostic{Line: at, Message: "unknown function: " + call.Name})
 		}
 	})
@@ -109,8 +109,8 @@ func unknownFuncs(expr tsvt.Expr, at tsvt.LineNumber) []Diagnostic {
 
 // isKnownFunc reports whether name (case-insensitive) is a builtin, including
 // the lazily-dispatched `if`.
-func isKnownFunc(name string) bool {
-	lower := strings.ToLower(name)
+func isKnownFunc(name funcName) bool {
+	lower := strings.ToLower(string(name))
 	if lower == "if" {
 		return true
 	}

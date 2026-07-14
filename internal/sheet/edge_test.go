@@ -122,7 +122,7 @@ func TestCheck_UnknownFunctionAdvisory(t *testing.T) {
 	require.NoError(t, err)
 	diags := sheet.Check(tmpl)
 	require.Len(t, diags, 1)
-	assert.False(t, diags[0].Fatal)
+	assert.False(t, diags[0].IsFatal)
 	assert.Contains(t, diags[0].Message, "bogus")
 }
 
@@ -144,7 +144,7 @@ func TestCheck_PerCellModifierFatal(t *testing.T) {
 	require.NoError(t, err)
 	diags := sheet.Check(tmpl)
 	require.Len(t, diags, 1)
-	assert.True(t, diags[0].Fatal)
+	assert.True(t, diags[0].IsFatal)
 }
 
 func TestCheck_StructuralWithRowFatal(t *testing.T) {
@@ -155,7 +155,7 @@ func TestCheck_StructuralWithRowFatal(t *testing.T) {
 	require.NoError(t, err)
 	diags := sheet.Check(tmpl)
 	require.Len(t, diags, 1)
-	assert.True(t, diags[0].Fatal)
+	assert.True(t, diags[0].IsFatal)
 }
 
 func TestCheck_CleanTemplate(t *testing.T) {

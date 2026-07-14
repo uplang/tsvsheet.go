@@ -22,7 +22,7 @@ var (
 )
 
 // testServer builds a server over a fresh session and records whether save ran.
-func testServer(t *testing.T) (*serve.Server, *bool) {
+func testServer(t *testing.T) (serve.Server, *bool) {
 	t.Helper()
 	sess, err := session.New(sampleTemplate, sampleData)
 	require.NoError(t, err)
@@ -31,7 +31,7 @@ func testServer(t *testing.T) (*serve.Server, *bool) {
 }
 
 // do issues a request against a server's handler and returns the recorder.
-func do(t *testing.T, srv *serve.Server, method, target, body string) *httptest.ResponseRecorder {
+func do(t *testing.T, srv serve.Server, method, target, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -49,7 +49,7 @@ func TestState(t *testing.T) {
 	var state session.State
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
 	assert.Equal(t, "7", state.Computed[0][4])
-	assert.False(t, state.Dirty)
+	assert.False(t, state.IsDirty)
 }
 
 func TestSetTemplate_OK(t *testing.T) {
@@ -62,7 +62,7 @@ func TestSetTemplate_OK(t *testing.T) {
 	var state session.State
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
 	assert.Equal(t, "12", state.Computed[0][4])
-	assert.True(t, state.Dirty)
+	assert.True(t, state.IsDirty)
 }
 
 func TestSetTemplate_SyntaxError(t *testing.T) {
