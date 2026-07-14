@@ -4,7 +4,7 @@ import (
 	app "github.com/gomatic/go-app"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/rename"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/rename"
 )
 
 const (
@@ -25,9 +25,9 @@ it defaults to the repository name from the remote. The module path always
 follows the remote regardless of [name].
 
 Examples:
-  template.cli rename
-  template.cli rename mytool
-  template.cli rename --dry-run
+  tsvsheet rename
+  tsvsheet rename mytool
+  tsvsheet rename --dry-run
 
 The --dry-run flag reports which files would change without writing or moving
 anything.`

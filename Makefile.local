@@ -1,0 +1,4 @@
+# Repo-local gate scoping (shared Makefile -includes this last).
+# src/grammar is the committed ANTLR-generated parser (Code generated … DO NOT
+# EDIT) lifted from uplang/tsvsheet; it is excluded from the coverage gate.
+COVER_PKGS = $(shell go list ./... | grep -v /src/grammar)

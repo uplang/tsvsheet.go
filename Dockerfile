@@ -1,4 +1,4 @@
-# Container image for the template.cli CLI, following the gomatic/build `make docker`
+# Container image for the tsvsheet CLI, following the gomatic/build `make docker`
 # contract: the `docker` target runs `build-all` (goreleaser) first, so the
 # binaries already exist under dist/ as <bin>-<os>-<arch>. This image only
 # copies the right one in — it does not build from source. The build context is
@@ -12,7 +12,7 @@
 # The gomatic convention is `FROM gomatic/runtime` (non-root user, CA certs,
 # distroless base). Until that image is published, distroless/static:nonroot
 # gives the same minimal, non-root result for the CGO-free static binary.
-ARG ENTRYPOINT_BIN=template.cli
+ARG ENTRYPOINT_BIN=tsvsheet
 FROM gcr.io/distroless/static:nonroot
 ARG ENTRYPOINT_BIN
 ARG TARGETOS

@@ -1,9 +1,9 @@
 package config
 
 import (
-	store "github.com/gomatic/template.cli/internal/config"
-	"github.com/gomatic/template.cli/internal/constants"
-	"github.com/gomatic/template.cli/internal/domain"
+	store "github.com/uplang/tsvsheet.go/internal/config"
+	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/domain"
 )
 
 // KeyFrom extracts and validates the configuration key from the positional args.

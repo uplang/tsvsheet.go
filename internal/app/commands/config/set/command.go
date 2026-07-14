@@ -4,7 +4,7 @@ import (
 	app "github.com/gomatic/go-app"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/config/set"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/config/set"
 )
 
 const (
@@ -14,9 +14,9 @@ const (
 	description = `Update or create a configuration value.
 
 Examples:
-  template.cli config set app.name myapp
-  template.cli config set database.host localhost
-  template.cli config set log.level debug --dry-run
+  tsvsheet config set app.name myapp
+  tsvsheet config set database.host localhost
+  tsvsheet config set log.level debug --dry-run
 
 The --dry-run flag shows what would be changed without making the change.
 This is a standard Unix pattern (-n/--dry-run) for safe operation previews.

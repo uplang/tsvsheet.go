@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/gomatic/template.cli/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 func testLogger() *slog.Logger {

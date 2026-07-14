@@ -26,7 +26,7 @@ type Store struct {
 // NewStore returns a store seeded with example data.
 func NewStore() Store {
 	return Store{data: map[Key]Value{
-		"app.name":        "template.cli",
+		"app.name":        "tsvsheet",
 		"app.version":     "1.0.0",
 		"database.host":   "localhost",
 		"database.port":   "5432",

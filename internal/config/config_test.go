@@ -10,7 +10,7 @@ import (
 // naming them once keeps the literals from repeating across cases.
 const (
 	appNameKey   Key   = "app.name"
-	appNameValue Value = "template.cli"
+	appNameValue Value = "tsvsheet"
 )
 
 func TestNewStore(t *testing.T) {

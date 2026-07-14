@@ -3,9 +3,9 @@ package config
 import (
 	"github.com/urfave/cli/v3"
 
-	"github.com/gomatic/template.cli/internal/app/commands/config/get"
-	"github.com/gomatic/template.cli/internal/app/commands/config/list"
-	"github.com/gomatic/template.cli/internal/app/commands/config/set"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/config/get"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/config/list"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/config/set"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	app "github.com/gomatic/go-app"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/process"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/process"
 )
 
 const (
@@ -22,16 +22,16 @@ This command demonstrates:
 
 Examples:
   # Process from stdin
-  echo "hello world" | template.cli process --uppercase
+  echo "hello world" | tsvsheet process --uppercase
 
   # Process from file
-  template.cli process --line-numbers input.txt
+  tsvsheet process --line-numbers input.txt
 
   # Chain with other Unix tools
-  cat data.txt | template.cli process --filter=error | grep -i critical
+  cat data.txt | tsvsheet process --filter=error | grep -i critical
 
   # Combine multiple transformations
-  template.cli process --uppercase --prefix=">> " --line-numbers input.txt`
+  tsvsheet process --uppercase --prefix=">> " --line-numbers input.txt`
 )
 
 const (

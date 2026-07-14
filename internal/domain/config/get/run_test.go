@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/gomatic/template.cli/internal/config"
-	"github.com/gomatic/template.cli/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/config"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 func testLogger() *slog.Logger {
@@ -26,7 +26,7 @@ func TestRun(t *testing.T) {
 		want    config.Value
 		args    []string
 	}{
-		{name: "existing key", config: Config{}, args: []string{"app.name"}, want: "template.cli"},
+		{name: "existing key", config: Config{}, args: []string{"app.name"}, want: "tsvsheet"},
 		{
 			name:   "missing key with default",
 			config: Config{DefaultValue: "fallback"},

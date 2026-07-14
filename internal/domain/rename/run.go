@@ -8,8 +8,8 @@ import (
 	"github.com/gomatic/go-module"
 	"github.com/gomatic/go-rewrite"
 
-	"github.com/gomatic/template.cli/internal/constants"
-	"github.com/gomatic/template.cli/internal/domain"
+	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/domain"
 )
 
 // Result is the outcome of the rename command: the identity it moved from and to,

@@ -11,11 +11,11 @@ import (
 	"github.com/gomatic/go-log"
 	"github.com/urfave/cli/v3"
 
-	"github.com/gomatic/template.cli/internal/app/commands/config"
-	"github.com/gomatic/template.cli/internal/app/commands/greet"
-	"github.com/gomatic/template.cli/internal/app/commands/process"
-	"github.com/gomatic/template.cli/internal/app/commands/rename"
-	"github.com/gomatic/template.cli/internal/app/commands/serve"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/config"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/greet"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/process"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/rename"
+	"github.com/uplang/tsvsheet.go/internal/app/commands/serve"
 )
 
 const (
@@ -48,9 +48,9 @@ Command Naming Convention:
 
 Version:
   Use --version flag (built-in urfave/cli support)`
-	envName   = "TEMPLATE_CLI"
+	envName   = "TSVSHEET"
 	envPrefix = envName + "_"
-	name      = `template.cli`
+	name      = `tsvsheet`
 	usage     = `Example CLI demonstrating best practices.`
 )
 

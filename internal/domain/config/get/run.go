@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/gomatic/template.cli/internal/config"
-	"github.com/gomatic/template.cli/internal/constants"
-	"github.com/gomatic/template.cli/internal/domain"
-	configdomain "github.com/gomatic/template.cli/internal/domain/config"
+	"github.com/uplang/tsvsheet.go/internal/config"
+	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/domain"
+	configdomain "github.com/uplang/tsvsheet.go/internal/domain/config"
 )
 
 // Result is the outcome of the "config get" command.

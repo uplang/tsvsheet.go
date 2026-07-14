@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/rename"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/rename"
 )
 
 // TestRenameCommand exercises the CLI wiring without running the real rename: it

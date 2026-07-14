@@ -24,7 +24,7 @@ func TestListCommand(t *testing.T) {
 			name: "list all",
 			args: []string{"list"},
 			wantContains: []string{
-				`"app.name": "template.cli"`,
+				`"app.name": "tsvsheet"`,
 				`"database.host": "localhost"`,
 			},
 		},
@@ -32,7 +32,7 @@ func TestListCommand(t *testing.T) {
 			name: "list with prefix",
 			args: []string{"list", "--prefix", "app."},
 			wantContains: []string{
-				`"app.name": "template.cli"`,
+				`"app.name": "tsvsheet"`,
 				`"app.version": "1.0.0"`,
 			},
 		},

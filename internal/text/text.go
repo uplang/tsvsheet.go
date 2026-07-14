@@ -13,7 +13,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gomatic/template.cli/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 type (

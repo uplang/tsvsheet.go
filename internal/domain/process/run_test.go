@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/gomatic/template.cli/internal/constants"
-	"github.com/gomatic/template.cli/internal/text"
+	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/text"
 )
 
 func TestRun(t *testing.T) {

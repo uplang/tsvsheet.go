@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gomatic/template.cli/internal/config"
-	"github.com/gomatic/template.cli/internal/domain"
+	"github.com/uplang/tsvsheet.go/internal/config"
+	"github.com/uplang/tsvsheet.go/internal/domain"
 )
 
 // Result is the set of configuration entries returned by the command. As a

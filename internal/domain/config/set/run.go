@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gomatic/template.cli/internal/config"
-	"github.com/gomatic/template.cli/internal/domain"
-	configdomain "github.com/gomatic/template.cli/internal/domain/config"
+	"github.com/uplang/tsvsheet.go/internal/config"
+	"github.com/uplang/tsvsheet.go/internal/domain"
+	configdomain "github.com/uplang/tsvsheet.go/internal/domain/config"
 )
 
 // Result is the outcome of the "config set" command. Setting produces no value.

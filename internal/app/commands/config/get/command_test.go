@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/gomatic/template.cli/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 func TestGetCommand(t *testing.T) {
@@ -25,7 +25,7 @@ func TestGetCommand(t *testing.T) {
 		{
 			name:         "get existing key",
 			args:         []string{"get", "app.name"},
-			wantContains: `"value": "template.cli"`,
+			wantContains: `"value": "tsvsheet"`,
 		},
 		{
 			name:         "get with default",

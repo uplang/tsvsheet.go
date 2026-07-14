@@ -4,7 +4,7 @@ import (
 	app "github.com/gomatic/go-app"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/greet"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/greet"
 )
 
 const (

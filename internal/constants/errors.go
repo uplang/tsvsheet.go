@@ -1,4 +1,4 @@
-// Package constants declares template.cli's sentinel error values. The error
+// Package constants declares tsvsheet's sentinel error values. The error
 // mechanism (the matchable string type) lives in the shared gomatic/go-error
 // library; these values are this template's own.
 package constants

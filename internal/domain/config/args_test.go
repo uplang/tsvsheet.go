@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	store "github.com/gomatic/template.cli/internal/config"
-	"github.com/gomatic/template.cli/internal/constants"
+	store "github.com/uplang/tsvsheet.go/internal/config"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 func TestKeyFrom(t *testing.T) {

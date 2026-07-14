@@ -1,4 +1,4 @@
-# template.cli
+# tsvsheet
 
 The canonical urfave/cli v3 Go project template — focused on the **layout standard** (strict three-tier `app → domain → implementation`, file-per-tier, naming/import conventions, the `rename` scaffolding). The generic CLI framework it once embedded now lives in shared gomatic libraries it consumes:
 

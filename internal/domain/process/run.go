@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/gomatic/template.cli/internal/constants"
-	"github.com/gomatic/template.cli/internal/domain"
-	"github.com/gomatic/template.cli/internal/text"
+	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/domain"
+	"github.com/uplang/tsvsheet.go/internal/text"
 )
 
 // Result is the outcome of the process command.

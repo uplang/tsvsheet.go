@@ -4,7 +4,7 @@ import (
 	app "github.com/gomatic/go-app"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/config/get"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/config/get"
 )
 
 const (
@@ -14,9 +14,9 @@ const (
 	description = `Retrieve a configuration value by key.
 
 Examples:
-  template.cli config get app.name
-  template.cli config get database.host
-  template.cli config get missing.key --default "fallback-value"
+  tsvsheet config get app.name
+  tsvsheet config get database.host
+  tsvsheet config get missing.key --default "fallback-value"
 
 This command demonstrates:
   - Single positional argument

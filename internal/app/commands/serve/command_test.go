@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/gomatic/template.cli/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 func TestServeCommand(t *testing.T) {

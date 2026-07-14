@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/gomatic/template.cli/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/constants"
 )
 
 func TestRun_Version(t *testing.T) {
@@ -23,7 +23,7 @@ func TestRun_Version(t *testing.T) {
 	}{
 		{
 			name:         "version flag outputs version",
-			args:         []string{"template.cli", "--version"},
+			args:         []string{"tsvsheet", "--version"},
 			wantContains: version,
 		},
 	}
@@ -103,32 +103,32 @@ func TestIntegration_ConfigCommand(t *testing.T) {
 	}{
 		{
 			name:           "list all config",
-			args:           []string{"template.cli", "config", "list"},
-			wantOutputCont: `"app.name": "template.cli"`,
+			args:           []string{"tsvsheet", "config", "list"},
+			wantOutputCont: `"app.name": "tsvsheet"`,
 		},
 		{
 			name:           "list with prefix",
-			args:           []string{"template.cli", "config", "list", "--prefix", "app."},
+			args:           []string{"tsvsheet", "config", "list", "--prefix", "app."},
 			wantOutputCont: `"app.name"`,
 		},
 		{
 			name:           "get existing key",
-			args:           []string{"template.cli", "config", "get", "app.name"},
-			wantOutputCont: `"value": "template.cli"`,
+			args:           []string{"tsvsheet", "config", "get", "app.name"},
+			wantOutputCont: `"value": "tsvsheet"`,
 		},
 		{
 			name:           "get with default",
-			args:           []string{"template.cli", "config", "get", "--default", "fallback", "missing.key"},
+			args:           []string{"tsvsheet", "config", "get", "--default", "fallback", "missing.key"},
 			wantOutputCont: `"value": "fallback"`,
 		},
 		{
 			name:    "get missing key without default",
-			args:    []string{"template.cli", "config", "get", "nonexistent.key"},
+			args:    []string{"tsvsheet", "config", "get", "nonexistent.key"},
 			wantErr: constants.ErrNotFound,
 		},
 		{
 			name: "set value (dry-run)",
-			args: []string{"template.cli", "config", "set", "-n", "test.key", "test-value"},
+			args: []string{"tsvsheet", "config", "set", "-n", "test.key", "test-value"},
 		},
 	}
 
@@ -219,27 +219,27 @@ func TestIntegration_GreetCommand(t *testing.T) {
 	}{
 		{
 			name:           "simple greet",
-			args:           []string{"template.cli", "greet", "World"},
+			args:           []string{"tsvsheet", "greet", "World"},
 			wantOutputCont: "Hello, World!",
 		},
 		{
 			name:           "custom greeting",
-			args:           []string{"template.cli", "greet", "--greeting", "Hola", "Alice"},
+			args:           []string{"tsvsheet", "greet", "--greeting", "Hola", "Alice"},
 			wantOutputCont: "Hola, Alice!",
 		},
 		{
 			name:           "uppercase",
-			args:           []string{"template.cli", "greet", "--uppercase", "Bob"},
+			args:           []string{"tsvsheet", "greet", "--uppercase", "Bob"},
 			wantOutputCont: "HELLO, BOB!",
 		},
 		{
 			name:           "with enthusiasm",
-			args:           []string{"template.cli", "greet", "--enthusiast", "World"},
+			args:           []string{"tsvsheet", "greet", "--enthusiast", "World"},
 			wantOutputCont: "Hello, World!!!",
 		},
 		{
 			name:           "combined flags",
-			args:           []string{"template.cli", "greet", "-g", "Hey", "-u", "-e", "Test"},
+			args:           []string{"tsvsheet", "greet", "-g", "Hey", "-u", "-e", "Test"},
 			wantOutputCont: "HEY, TEST!!!",
 		},
 	}

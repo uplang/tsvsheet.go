@@ -6,7 +6,7 @@ import (
 	app "github.com/gomatic/go-app"
 	"github.com/urfave/cli/v3"
 
-	domain "github.com/gomatic/template.cli/internal/domain/serve"
+	domain "github.com/uplang/tsvsheet.go/internal/domain/serve"
 )
 
 const (
@@ -26,10 +26,10 @@ On shutdown, it will gracefully finish processing in-flight requests within the
 shutdown timeout period.
 
 Examples:
-  template.cli serve
-  template.cli serve --host 0.0.0.0 --port 8080
-  template.cli serve --shutdown-timeout 30s
-  HOST=0.0.0.0 PORT=3000 template.cli serve
+  tsvsheet serve
+  tsvsheet serve --host 0.0.0.0 --port 8080
+  tsvsheet serve --shutdown-timeout 30s
+  HOST=0.0.0.0 PORT=3000 tsvsheet serve
 
 Endpoints:
   GET /health - Health check endpoint (returns {"status":"ok"})

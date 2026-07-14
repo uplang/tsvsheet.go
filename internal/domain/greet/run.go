@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gomatic/template.cli/internal/constants"
-	"github.com/gomatic/template.cli/internal/domain"
-	"github.com/gomatic/template.cli/internal/greeting"
+	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/domain"
+	"github.com/uplang/tsvsheet.go/internal/greeting"
 )
 
 const (

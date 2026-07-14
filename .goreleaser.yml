@@ -1,6 +1,6 @@
 version: 2
 
-project_name: template.cli
+project_name: tsvsheet
 
 dist: dist
 
