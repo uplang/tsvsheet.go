@@ -27,7 +27,8 @@ func intToken(node antlr.TerminalNode) (int, error) {
 	n, err := strconv.Atoi(node.GetText())
 	if err != nil {
 		sym := node.GetSymbol()
-		return 0, constants.ErrSyntax.With(err, "line", sym.GetLine(), "column", sym.GetColumn(), "message", "expected an integer")
+		return 0, constants.ErrSyntax.With(err,
+			"line", sym.GetLine(), "column", sym.GetColumn(), "message", "expected an integer")
 	}
 	return n, nil
 }

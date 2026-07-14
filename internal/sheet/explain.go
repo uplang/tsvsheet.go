@@ -9,10 +9,10 @@ import (
 // formula that wrote it (empty for a plain data cell), and the resolved value
 // of each reference the formula reads.
 type Trace struct {
-	Cell    Address      `json:"cell"`
 	Value   string       `json:"value"`
 	Formula string       `json:"formula,omitempty"`
 	Inputs  []TraceInput `json:"inputs,omitempty"`
+	Cell    Address      `json:"cell"`
 }
 
 // TraceInput is one reference a formula reads, with its resolved value.

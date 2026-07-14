@@ -12,8 +12,8 @@ type phase struct {
 // computation carries the mutable computed grid, bound header names, and the
 // logical column width through a single processing pass.
 type computation struct {
-	grid  Grid
 	names map[string]int
+	grid  Grid
 	width int
 }
 

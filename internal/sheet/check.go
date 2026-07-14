@@ -11,8 +11,8 @@ import (
 // reject the template; a non-fatal one is advisory (the construct still
 // computes, e.g. an unknown function to #NAME?).
 type Diagnostic struct {
-	Line    tsvt.LineNumber `json:"line"`
 	Message string          `json:"message"`
+	Line    tsvt.LineNumber `json:"line"`
 	Fatal   bool            `json:"fatal"`
 }
 
@@ -48,7 +48,8 @@ func checkLine(line tsvt.Line) []Diagnostic {
 // bare column: a range-scoped form (rule 7) or a per-cell/row form (rule 18).
 func checkStructural(cmd tsvt.Structural) []Diagnostic {
 	if !isBareColumn(cmd.Ref) {
-		return []Diagnostic{{Line: cmd.At, Message: "structural command requires a single column (§6 range/cell scope is open)", Fatal: true}}
+		const msg = "structural command requires a single column (§6 range/cell scope is open)"
+		return []Diagnostic{{Line: cmd.At, Message: msg, Fatal: true}}
 	}
 	return nil
 }

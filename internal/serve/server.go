@@ -67,9 +67,9 @@ func (srv *Server) handleTemplate(w http.ResponseWriter, r *http.Request) {
 // cellRequest is the PUT /api/data/cell body; row and col are 0-based raw-grid
 // indices (contracts/engine-api.md).
 type cellRequest struct {
+	Value string `json:"value"`
 	Row   int    `json:"row"`
 	Col   int    `json:"col"`
-	Value string `json:"value"`
 }
 
 // handleDataCell edits one raw data cell and returns the new state.

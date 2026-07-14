@@ -16,9 +16,9 @@ type parseConfig struct {
 // normalized source form (cells for a row).
 type lineView struct {
 	Kind   sheet.LineKind `json:"kind"`
-	Line   int            `json:"line"`
 	Source string         `json:"source"`
 	Cells  []string       `json:"cells,omitempty"`
+	Line   int            `json:"line"`
 }
 
 // worksheetView is the JSON projection of a parsed template.

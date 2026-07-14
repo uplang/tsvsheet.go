@@ -15,7 +15,12 @@ var version = "dev"
 // osExit is indirected so tests can observe the process exit code.
 var osExit = os.Exit
 
-func main() {
+func main() { osExit(run(os.Args)) }
+
+// run wires the build version into the CLI and executes it, returning the
+// process exit code. Keeping the logic here (rather than in main) makes the
+// whole entry path testable.
+func run(args []string) int {
 	cli.Version = version
-	osExit(cli.Run(context.Background(), os.Args))
+	return cli.Run(context.Background(), args)
 }

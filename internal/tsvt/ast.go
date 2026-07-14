@@ -66,16 +66,16 @@ type FinalMarker struct {
 // Structural is a standalone structural command, e.g. `=A<` (§4/§6).
 type Structural struct {
 	lineMarker
-	At  LineNumber
 	Ref Reference
 	Mod Modifier
+	At  LineNumber
 }
 
 // Row is a line of TAB-separated cells; empty cells preserve column position.
 type Row struct {
 	lineMarker
-	At    LineNumber
 	Cells []Cell
+	At    LineNumber
 }
 
 // Cell is one TAB-delimited field of a row. The set is sealed.
@@ -101,8 +101,8 @@ type LiteralCell struct {
 type PlacementCell struct {
 	cellMarker
 	Ref     Reference
-	Mod     Modifier // ModNone when absent
-	Payload Payload  // nil when absent
+	Payload Payload
+	Mod     Modifier
 }
 
 // Payload is what follows a placed reference: a formula or a literal datum
@@ -292,16 +292,16 @@ const (
 // Binary is a binary operation.
 type Binary struct {
 	exprMarker
-	Op    BinaryOp
 	Left  Expr
 	Right Expr
+	Op    BinaryOp
 }
 
 // Unary is a unary sign operation.
 type Unary struct {
 	exprMarker
-	Op UnaryOp
 	X  Expr
+	Op UnaryOp
 }
 
 // Call is a function call; Name is case-preserved (identity is resolved

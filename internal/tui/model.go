@@ -28,11 +28,12 @@ const (
 type Model struct {
 	session     *session.Session
 	save        Saver
-	state       session.State
-	row, col    int
-	mode        mode
 	buffer      string
 	status      string
+	state       session.State
+	row         int
+	col         int
+	mode        mode
 	confirmQuit bool
 	quitting    bool
 }

@@ -242,7 +242,9 @@ func buildNumericGroupedRange(ctx grammar.IGroupedRangeContext, row RowRef) (Ref
 func groupedNumericCol(ctx grammar.INumericRefContext) (Col, error) {
 	if ctx.COMMA() != nil {
 		start := ctx.GetStart()
-		return nil, constants.ErrSyntax.With(nil, "line", start.GetLine(), "column", start.GetColumn(), "message", "row not allowed in a grouped-range column")
+		return nil, constants.ErrSyntax.With(nil,
+			"line", start.GetLine(), "column", start.GetColumn(),
+			"message", "row not allowed in a grouped-range column")
 	}
 	return numericCol(ctx.SignedInt())
 }

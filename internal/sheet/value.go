@@ -30,9 +30,9 @@ const (
 
 // Value is an evaluated cell value: empty, number, string, or error.
 type Value struct {
+	str  string
 	kind valueKind
 	num  float64
-	str  string
 }
 
 // emptyValue is the empty cell (§ ADR 0003 rule 8).

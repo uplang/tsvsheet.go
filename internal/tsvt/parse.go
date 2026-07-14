@@ -38,7 +38,9 @@ type errorCollector struct {
 
 // SyntaxError implements antlr.ErrorListener, converting the report into
 // constants.ErrSyntax; only the first error is kept.
-func (c *errorCollector) SyntaxError(_ antlr.Recognizer, _ any, line, column int, msg string, _ antlr.RecognitionException) {
+func (c *errorCollector) SyntaxError(
+	_ antlr.Recognizer, _ any, line, column int, msg string, _ antlr.RecognitionException,
+) {
 	if c.err == nil {
 		c.err = constants.ErrSyntax.With(nil, "line", line, "column", column, "message", msg)
 	}

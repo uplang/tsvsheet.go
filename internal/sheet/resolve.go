@@ -8,19 +8,19 @@ import "github.com/uplang/tsvsheet.go/internal/tsvt"
 // by structural ops, ADR 0003 rule 19), so columns computed to the right do not
 // change what `$` (last column) and negative indices mean.
 type resolver struct {
+	names map[string]int
 	grid  Grid
 	row   int
 	width int
-	names map[string]int
 }
 
 // colRes is the outcome of resolving a column: a real index, or an unbound
 // named column carried as name for the string-literal fallback (ADR 0003
 // rule 16).
 type colRes struct {
+	name  string
 	index int
 	ok    bool
-	name  string
 }
 
 // cellset is a resolved reference as an operand: the resolved cell values and

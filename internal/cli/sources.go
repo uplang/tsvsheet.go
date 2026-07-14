@@ -50,7 +50,8 @@ func noClose() error { return nil }
 // impossible case of reading both from a single stdin stream.
 func templateAndData(tmpl, data sourcePath, stdin io.Reader) (io.Reader, io.Reader, closeFunc, error) {
 	if tmpl.isStdin() && data.isStdin() {
-		return nil, nil, nil, constants.ErrInvalidValue.With(nil, "message", "cannot read both template and data from stdin; give a path for one")
+		const msg = "cannot read both template and data from stdin; give a path for one"
+		return nil, nil, nil, constants.ErrInvalidValue.With(nil, "message", msg)
 	}
 	tmplReader, closeTmpl, err := tmpl.open(stdin)
 	if err != nil {

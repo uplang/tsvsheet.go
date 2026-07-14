@@ -28,12 +28,12 @@ type State struct {
 
 // Session is a mutable worksheet. Its methods are safe for concurrent use.
 type Session struct {
-	mu          sync.Mutex
 	templateSrc []byte
 	template    tsvt.Template
 	data        sheet.Grid
 	computed    sheet.Grid
 	diagnostics []sheet.Diagnostic
+	mu          sync.Mutex
 	dirty       bool
 }
 
