@@ -10,6 +10,7 @@
 # Build output: `make build` (bin/), `make build-all` / goreleaser (dist/)
 /bin/
 /dist/
+/wasm
 
 # Test + coverage: `make cover` / `make test-all` (COVERAGE_FOLDER=var),
 # compiled test binaries, and stray coverage profiles/reports

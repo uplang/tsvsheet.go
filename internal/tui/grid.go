@@ -18,6 +18,58 @@ func (m Model) height() int {
 	return 1
 }
 
+// chromeLines is the number of non-data lines the view spends around the grid
+// (title, formula bar, column header, the status bar and its top margin, and
+// the trailing newline), reserved when sizing the visible row window.
+const chromeLines = 6
+
+// visibleRows is how many data rows fit the terminal: the height minus the
+// chrome, at least one. Before the first resize (viewHeight 0) the whole grid
+// is shown, matching the pre-viewport behavior.
+func (m Model) visibleRows() int {
+	if m.viewHeight <= 0 {
+		return m.height()
+	}
+	if fit := m.viewHeight - chromeLines; fit > 0 {
+		return fit
+	}
+	return 1
+}
+
+// visibleBounds is the half-open range of grid rows to render, [top, end).
+func (m Model) visibleBounds() (int, int) {
+	end := m.top + m.visibleRows()
+	if end > m.height() {
+		end = m.height()
+	}
+	return m.top, end
+}
+
+// scrollToCursor adjusts the vertical scroll so the cursor row stays on screen,
+// then clamps it within the grid — the sole place `top` moves.
+func (m Model) scrollToCursor() Model {
+	vis := m.visibleRows()
+	if m.row < m.top {
+		m.top = m.row
+	} else if m.row >= m.top+vis {
+		m.top = m.row - vis + 1
+	}
+	m.top = clampTop(m.top, m.height()-vis)
+	return m
+}
+
+// clampTop bounds a scroll offset to [0, max]; a max below zero (grid shorter
+// than the window) pins it to the top.
+func clampTop(top, max int) int {
+	if max < 0 || top < 0 {
+		return 0
+	}
+	if top > max {
+		return max
+	}
+	return top
+}
+
 // gridWidth is the widest row of a grid.
 func gridWidth(g [][]string) int {
 	w := 0

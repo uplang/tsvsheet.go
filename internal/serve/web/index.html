@@ -435,6 +435,29 @@
 					els.grid.replaceChildren(table);
 				}
 
+				// refreshValues patches cell values in place after a recompute.
+				// Recompute changes only computed values (never the grid's shape or
+				// source), so we update the existing <td> nodes instead of rebuilding
+				// the table — preserving selection, reference highlighting, the embed
+				// panel, and scroll position, and avoiding a full-screen flicker on
+				// every auto-refresh tick.
+				function refreshValues(state) {
+					sheet = state;
+					for (let r = 0; r < state.computed.length; r++) {
+						const row = state.computed[r];
+						for (let c = 0; c < row.length; c++) {
+							const td = tdAt(r, c);
+							if (!td) continue;
+							const value = at(state.computed, r, c);
+							if (td.textContent !== value) td.textContent = value;
+							td.classList.toggle("err", ERR.test(value));
+						}
+					}
+					renderDiagnostics(state.diagnostics);
+					els.state.textContent = state.dirty ? "unsaved changes" : "saved";
+					els.state.classList.toggle("dirty", state.dirty);
+				}
+
 				function th(text) {
 					const el = document.createElement("th");
 					el.textContent = text;
@@ -689,7 +712,7 @@
 						}
 						try {
 							const resp = await api("POST", "/api/recompute");
-							render(resp);
+							refreshValues(resp);
 							scheduleRefresh(resp.next_refresh_millis);
 						} catch (err) {
 							reportError(err);

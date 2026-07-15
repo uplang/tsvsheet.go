@@ -63,11 +63,13 @@ func (m Model) formulaBar() string {
 	return formulaBarSty.Render(addr+": ") + source
 }
 
-// grid renders the computed sheet with column letters, row numbers, and the
-// cursor highlight.
+// grid renders the visible slice of the computed sheet with column letters, row
+// numbers, and the cursor highlight, scrolled vertically to keep the cursor on
+// screen.
 func (m Model) grid() string {
 	rows := []string{m.headerRow()}
-	for r := 0; r < m.height(); r++ {
+	top, end := m.visibleBounds()
+	for r := top; r < end; r++ {
 		rows = append(rows, m.gridRow(r))
 	}
 	return strings.Join(rows, "\n")

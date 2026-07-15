@@ -2,6 +2,7 @@ package tui
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -286,13 +287,83 @@ func TestUnhandledKeyResetsConfirm(t *testing.T) {
 	assert.Equal(t, modeNav, m.mode)
 }
 
-func TestUpdate_IgnoresNonKeyMsg(t *testing.T) {
+// otherMsg is a message the update loop does not recognize.
+type otherMsg struct{}
+
+func TestUpdate_IgnoresUnknownMsg(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
-	next, cmd := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	next, cmd := m.Update(otherMsg{})
 	assert.Equal(t, m, next)
 	assert.Nil(t, cmd)
+}
+
+// tallSheet builds an n-row, single-column sheet for viewport tests.
+func tallSheet(t *testing.T, n int) Model {
+	t.Helper()
+	s, err := session.New([]byte(strings.Repeat("r\n", n)))
+	require.NoError(t, err)
+	return New(s, nil, nil)
+}
+
+func TestViewport_ScrollsToKeepCursorVisible(t *testing.T) {
+	t.Parallel()
+
+	m := tallSheet(t, 30)
+	// Before any resize the whole grid is shown (viewHeight 0 → all rows).
+	assert.Equal(t, m.height(), m.visibleRows())
+
+	// A short window: height 10 → 10-6 chrome = 4 visible data rows.
+	next, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = next.(Model)
+	assert.Nil(t, cmd)
+	assert.Equal(t, 4, m.visibleRows())
+	assert.Equal(t, 0, m.top) // cursor at top → no scroll
+
+	// Move down past the window; the view scrolls to follow (down branch).
+	for i := 0; i < 20; i++ {
+		m = press(t, m, "down")
+	}
+	assert.Equal(t, 20, m.row)
+	assert.Equal(t, 17, m.top) // row - visible + 1
+	top, end := m.visibleBounds()
+	assert.Equal(t, 17, top)
+	assert.Equal(t, 21, end)
+
+	// The grid renders only the visible slice: header + 4 rows = 5 lines.
+	assert.Equal(t, 5, strings.Count(stripANSI(m.grid()), "\n")+1)
+
+	// Move back up; the view scrolls up (up branch) and returns to the top.
+	for i := 0; i < 25; i++ {
+		m = press(t, m, "up")
+	}
+	assert.Equal(t, 0, m.row)
+	assert.Equal(t, 0, m.top)
+}
+
+func TestViewport_ShortSheetAndTinyWindow(t *testing.T) {
+	t.Parallel()
+
+	// A window smaller than the chrome still shows one data row.
+	tiny, _ := tallSheet(t, 30).Update(tea.WindowSizeMsg{Width: 40, Height: 3})
+	assert.Equal(t, 1, tiny.(Model).visibleRows())
+
+	// A short sheet in a tall window: bounds clamp to the grid height.
+	short := newModel(t, nil) // 2 rows
+	sized, _ := short.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
+	top, end := sized.(Model).visibleBounds()
+	assert.Equal(t, 0, top)
+	assert.Equal(t, sized.(Model).height(), end) // end clamped to 2
+}
+
+func TestClampTop(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 0, clampTop(5, -1))   // grid shorter than window → pin top
+	assert.Equal(t, 0, clampTop(-3, 10))  // negative offset → top
+	assert.Equal(t, 10, clampTop(15, 10)) // beyond the last page → last page
+	assert.Equal(t, 7, clampTop(7, 10))   // within range → unchanged
 }
 
 func TestInit(t *testing.T) {

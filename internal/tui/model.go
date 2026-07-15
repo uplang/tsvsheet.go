@@ -36,6 +36,8 @@ type Model struct {
 	state            session.State
 	row              int
 	col              int
+	viewHeight       int // terminal height in rows (0 until the first resize)
+	top              int // index of the first grid row shown (vertical scroll)
 	mode             mode
 	isConfirmingQuit bool
 	isQuitting       bool
@@ -92,6 +94,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = m.session.Recompute()
 		}
 		return m, m.tick()
+	case tea.WindowSizeMsg:
+		m.viewHeight = msg.Height
+		return m.scrollToCursor(), nil
 	case tea.KeyMsg:
 		if m.mode == modeEdit {
 			return m.keyEdit(msg)
@@ -123,7 +128,7 @@ func (m Model) move(key string) (Model, bool) {
 	default:
 		return m, false
 	}
-	return m, true
+	return m.scrollToCursor(), true
 }
 
 // command handles the non-movement navigation keys.
