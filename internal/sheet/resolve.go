@@ -39,12 +39,13 @@ func newComputer(s Sheet, now time.Time) computer {
 	return computer{now: now, sheet: s, cache: cache, phase: phase}
 }
 
-// output is a cell's rendered value: a literal verbatim, a formula computed.
-func (c computer) output(row rowIndex, col colIndex, cl cell) textVal {
+// cellValue is a cell's evaluated Value: a literal parsed, a formula computed
+// (which may be a dynamic array that later spills).
+func (c computer) cellValue(row rowIndex, col colIndex, cl cell) Value {
 	if !cl.isFormula() {
-		return textVal(cl.text)
+		return value(textVal(cl.text))
 	}
-	return textVal(c.read(row, col).String())
+	return c.read(row, col)
 }
 
 // read returns the value at (row, col), evaluating and memoizing it on first

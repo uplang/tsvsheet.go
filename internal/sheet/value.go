@@ -34,15 +34,22 @@ const (
 	kindString
 	kindBool
 	kindDate
+	kindArray
 	kindError
 )
 
-// Value is an evaluated cell value: empty, number, string, or error.
+// Value is an evaluated cell value: empty, number, string, boolean, date, error,
+// or a 2-D array (a dynamic-array result that spills, or reduces to its top-left
+// value in a scalar context).
 type Value struct {
 	str  string
+	arr  [][]Value
 	kind valueKind
 	num  float64
 }
+
+// arrayValue wraps a non-empty rows×columns array result.
+func arrayValue(m [][]Value) Value { return Value{kind: kindArray, arr: m} }
 
 // emptyValue is the empty cell (§ ADR 0003 rule 8).
 func emptyValue() Value { return Value{kind: kindEmpty} }
@@ -111,6 +118,8 @@ func (v Value) String() string {
 		return "FALSE"
 	case kindDate:
 		return renderSerial(floatVal(v.num))
+	case kindArray:
+		return v.arr[0][0].String()
 	case kindString, kindError:
 		return v.str
 	default:
@@ -128,6 +137,8 @@ func (v Value) asNumber() (float64, Value) {
 		return 0, emptyValue()
 	case kindNumber, kindBool, kindDate:
 		return v.num, v
+	case kindArray:
+		return v.arr[0][0].asNumber()
 	case kindError:
 		return 0, v
 	default: // kindString

@@ -111,6 +111,9 @@ func (r resolver) evalLazy(name funcName, args []tsvt.Expr) (Value, boolResult) 
 	if v, ok := r.evalCriteria(name, args); ok {
 		return v, true
 	}
+	if v, ok := r.evalArray(name, args); ok {
+		return v, true
+	}
 	return r.evalInspector(name, args)
 }
 

@@ -84,17 +84,124 @@ func parseCell(text textVal, row rowIndex, col colIndex) (cell, error) {
 func (s Sheet) Compute() Grid { return s.ComputeAt(time.Now()) }
 
 // ComputeAt is Compute with the clock injected, so volatile functions are
-// deterministic within a pass (and testable).
+// deterministic within a pass (and testable). It computes every cell's value,
+// then renders — spilling dynamic-array results into empty neighbours.
 func (s Sheet) ComputeAt(at time.Time) Grid {
 	comp := newComputer(s, at)
-	out := make(Grid, len(s.cells))
+	values := make([][]Value, len(s.cells))
 	for r, row := range s.cells {
-		out[r] = make([]string, len(row))
+		values[r] = make([]Value, len(row))
 		for c, cl := range row {
-			out[r][c] = string(comp.output(rowIndex(r), colIndex(c), cl))
+			values[r][c] = comp.cellValue(rowIndex(r), colIndex(c), cl)
+		}
+	}
+	return s.render(values)
+}
+
+// dims is an output grid's row and column extent.
+type dims struct{ rows, cols int }
+
+// render turns the computed value grid into the output string grid, spilling any
+// dynamic-array result down-and-right from its anchor.
+func (s Sheet) render(values [][]Value) Grid {
+	out := s.fillScalars(values, outputExtent(values))
+	s.spillArrays(out, values)
+	return out
+}
+
+// outputExtent is the grid extent needed once every array result has spilled.
+func outputExtent(values [][]Value) dims {
+	rows, cols := len(values), 0
+	for r := range values {
+		cols = max(cols, len(values[r]))
+		for c := range values[r] {
+			if a := values[r][c]; a.kind == kindArray {
+				rows = max(rows, r+len(a.arr))
+				cols = max(cols, c+len(a.arr[0]))
+			}
+		}
+	}
+	return dims{rows: rows, cols: cols}
+}
+
+// fillScalars renders each cell at its own position: a literal verbatim, a
+// formula's computed value (an array renders its top-left anchor here;
+// spillArrays overwrites the spilled cells).
+func (s Sheet) fillScalars(values [][]Value, d dims) Grid {
+	out := make(Grid, d.rows)
+	for r := range out {
+		out[r] = make([]string, d.cols)
+		for c := range out[r] {
+			out[r][c] = s.scalarText(values, Address{Row: r, Col: c})
 		}
 	}
 	return out
+}
+
+// scalarText renders one cell's own text: a literal verbatim, a formula's value,
+// empty when beyond the source grid.
+func (s Sheet) scalarText(values [][]Value, at Address) string {
+	if at.Row >= len(values) || at.Col >= len(values[at.Row]) {
+		return ""
+	}
+	if !s.cells[at.Row][at.Col].isFormula() {
+		return s.cells[at.Row][at.Col].text
+	}
+	return values[at.Row][at.Col].String()
+}
+
+// spillArrays writes each array result into the output grid.
+func (s Sheet) spillArrays(out Grid, values [][]Value) {
+	for r := range values {
+		for c := range values[r] {
+			if values[r][c].kind == kindArray {
+				s.spill(out, Address{Row: r, Col: c}, values[r][c].arr)
+			}
+		}
+	}
+}
+
+// spill writes an array from its anchor, or #SPILL! at the anchor when a target
+// cell is occupied.
+func (s Sheet) spill(out Grid, anchor Address, arr [][]Value) {
+	if s.spillBlocked(anchor, arr) {
+		out[anchor.Row][anchor.Col] = string(ErrSpill)
+		return
+	}
+	for i := range arr {
+		for j := range arr[i] {
+			out[anchor.Row+i][anchor.Col+j] = arr[i][j].String()
+		}
+	}
+}
+
+// spillBlocked reports whether any non-anchor target cell already holds content.
+func (s Sheet) spillBlocked(anchor Address, arr [][]Value) boolResult {
+	for i := range arr {
+		for j := range arr[i] {
+			target := Address{Row: anchor.Row + i, Col: anchor.Col + j}
+			if s.blocksSpill(anchor, target) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// blocksSpill reports whether target (a spill destination other than the anchor
+// itself) already holds content and so blocks the spill.
+func (s Sheet) blocksSpill(anchor, target Address) boolResult {
+	return boolResult(target != anchor && !bool(s.isEmptyCell(target)))
+}
+
+// isEmptyCell reports whether a source cell is empty (spillable): out of the
+// source grid, or a blank non-formula cell.
+func (s Sheet) isEmptyCell(at Address) boolResult {
+	if at.Row >= len(s.cells) || at.Col >= len(s.cells[at.Row]) {
+		return true
+	}
+	cl := s.cells[at.Row][at.Col]
+	return boolResult(cl.text == "" && !bool(cl.isFormula()))
 }
 
 // at returns the cell at (row, col); the boolean reports whether the position

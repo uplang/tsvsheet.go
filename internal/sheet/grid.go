@@ -1,6 +1,7 @@
-// Package sheet is the tsvsheet processor: it loads a .tsv value grid, applies a
-// parsed .tsvt template (internal/tsvt) per SPECIFICATION §9 with the semantics
-// fixed in specs/decisions/0003-open-semantics.md, and emits the computed grid.
+// TSV serialization for the sheet engine: reading a .tsvt grid into a Grid of
+// raw cell strings and writing a computed Grid back out. The A1 reference
+// resolution and formula evaluation live in model.go and eval.go; this file is
+// just the tab-separated line format. (The package doc is in model.go.)
 package sheet
 
 import (
@@ -18,7 +19,8 @@ const (
 )
 
 // Grid is a rectangular value grid indexed [row][col], 0-based. Cells are raw
-// strings; the .tsv side carries no formulas (§2).
+// strings: a literal's own text on input, or a formula cell's computed value
+// after ComputeAt.
 type Grid [][]string
 
 // ReadTSV reads a tab-separated value grid. Rows are newline-separated; a

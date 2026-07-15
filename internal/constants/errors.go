@@ -1,6 +1,6 @@
 // Package constants declares tsvsheet's sentinel error values. The error
 // mechanism (the matchable string type) lives in the shared gomatic/go-error
-// library; these values are this template's own.
+// library; these values are this package's own.
 package constants
 
 // Imported bare (the package is named error); this file declares only sentinels
@@ -9,7 +9,7 @@ import errs "github.com/gomatic/go-error"
 
 // Keep these constants sorted alphabetically.
 const (
-	ErrDiagnostics     errs.Const = "template has diagnostics"
+	ErrDiagnostics     errs.Const = "sheet has diagnostics"
 	ErrInvalidName     errs.Const = "invalid name"
 	ErrInvalidValue    errs.Const = "invalid value"
 	ErrMissingArgument errs.Const = "missing required argument"
