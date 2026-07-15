@@ -10,12 +10,14 @@ import (
 type ErrorValue string
 
 // The error values. #REF! (out-of-grid), #VALUE! (type), #NAME? (unknown
-// function / unbound name), #DIV/0! (division or modulo by zero).
+// function / unbound name), #DIV/0! (division or modulo by zero), #CIRC!
+// (a formula whose evaluation depends on itself).
 const (
 	ErrRef   ErrorValue = "#REF!"
 	ErrValue ErrorValue = "#VALUE!"
 	ErrName  ErrorValue = "#NAME?"
 	ErrDiv   ErrorValue = "#DIV/0!"
+	ErrCirc  ErrorValue = "#CIRC!"
 )
 
 // valueKind tags the three inhabited value shapes plus empty.
@@ -63,10 +65,10 @@ func value(raw textVal) Value {
 	return stringValue(raw)
 }
 
-// isErrorCode reports whether raw is one of the four error values.
+// isErrorCode reports whether raw is one of the error values.
 func isErrorCode(raw textVal) bool {
 	switch ErrorValue(raw) {
-	case ErrRef, ErrValue, ErrName, ErrDiv:
+	case ErrRef, ErrValue, ErrName, ErrDiv, ErrCirc:
 		return true
 	default:
 		return false

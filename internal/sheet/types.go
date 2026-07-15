@@ -23,8 +23,8 @@ type (
 	funcName string
 	// decimalPlaces is a rounding precision.
 	decimalPlaces int
-	// offsetVal is a last-row offset in a reference.
+	// offsetVal is a last-row offset in a rendered reference.
 	offsetVal int
-	// headerCount is a pending count of header lines to consume.
-	headerCount int
+	// rowNumber is a 1-based absolute data row (as written `C$4`).
+	rowNumber int
 )

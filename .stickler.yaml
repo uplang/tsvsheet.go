@@ -1,0 +1,17 @@
+# Per-repo stickler overlay (deep-merged onto the distribute-managed
+# .golangci.yaml, which is reset on every tools.repository push — so a repo's
+# lint divergence lives here, not in the managed file).
+#
+# G703 (gosec "path traversal via taint analysis") is a false positive for the
+# serve/tui saver: it writes the computed sheet back to the file the operator
+# named on the command line. The os.WriteFile path originates in os.Args, so the
+# taint analysis flags it — but writing the user's own positional <sheet>
+# argument is precisely the command's purpose, not an untrusted traversal sink.
+config:
+  golangci-lint:
+    linters:
+      settings:
+        gosec:
+          excludes:
+            add:
+              - G703

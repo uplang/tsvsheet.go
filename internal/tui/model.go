@@ -1,8 +1,8 @@
 // Package tui is the terminal frontend: a bubbletea model over the shared
-// session.Session, giving the same capabilities as the browser editor —
-// navigate the computed grid, edit data cells and the template, recompute, and
-// save — driven by the one engine. The model holds no language semantics; every
-// mutation goes through the session.
+// session.Session, editing the spreadsheet grid with the same capabilities as
+// the browser editor — navigate cells, edit any cell (a value or an =formula),
+// recompute, and save — driven by the one engine. The model holds no language
+// semantics; every mutation goes through the session.
 package tui
 
 import (
@@ -12,28 +12,15 @@ import (
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
-// Saver persists the worksheet; injected so the model stays filesystem-free.
+// Saver persists the spreadsheet; injected so the model stays filesystem-free.
 type Saver func() error
-
-// key names shared across the input handlers.
-const (
-	keyEnter = "enter"
-	keyEsc   = "esc"
-)
-
-// cursorPos is a grid cursor coordinate; editText is an edit-buffer value.
-type (
-	cursorPos int
-	editText  string
-)
 
 // mode is the model's current input mode.
 type mode int
 
 const (
-	modeNav      mode = iota // navigating the grid
-	modeCell                 // editing a data cell
-	modeTemplate             // editing the template text
+	modeNav  mode = iota // navigating the grid
+	modeEdit             // editing the selected cell's source
 )
 
 // Model is the terminal spreadsheet, a tea.Model over a session.
@@ -55,8 +42,20 @@ func New(s *session.Session, save Saver) Model {
 	return Model{session: s, save: save, state: s.Snapshot(), status: helpNav}
 }
 
-// helpNav is the resting-mode hint.
-const helpNav = "arrows/hjkl move · enter edit · t template · ctrl+s save · q quit"
+// helpNav and helpEdit are the mode hints.
+const (
+	helpNav  = "arrows/hjkl move · enter edit · ctrl+s save · q quit"
+	helpEdit = "type a value or =formula · enter commit · esc cancel"
+)
+
+// The key names the update loop dispatches on.
+const (
+	keyEnter = "enter"
+	keyEsc   = "esc"
+)
+
+// editText is an in-progress cell edit buffer.
+type editText string
 
 // Init implements tea.Model; the initial state is already loaded.
 func (Model) Init() tea.Cmd { return nil }
@@ -67,17 +66,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	switch m.mode {
-	case modeCell:
-		return m.keyCell(key)
-	case modeTemplate:
-		return m.keyTemplate(key)
-	default:
-		return m.keyNav(key)
+	if m.mode == modeEdit {
+		return m.keyEdit(key)
 	}
+	return m.keyNav(key)
 }
 
-// keyNav handles navigation-mode keys: cursor movement and mode/command entry.
+// keyNav handles navigation-mode keys: cursor movement and commands.
 func (m Model) keyNav(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if moved, handled := m.move(key.String()); handled {
 		return moved, nil
@@ -89,13 +84,13 @@ func (m Model) keyNav(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) move(key string) (Model, bool) {
 	switch key {
 	case "up", "k":
-		m.row, m.isConfirmingQuit = clampDown(cursorPos(m.row)), false
+		m.row, m.isConfirmingQuit = int(clampDown(cursorPos(m.row))), false
 	case "down", "j":
-		m.row, m.isConfirmingQuit = clampUp(cursorPos(m.row), cursorPos(len(m.state.Computed)-1)), false
+		m.row, m.isConfirmingQuit = int(clampUp(cursorPos(m.row), cursorPos(m.height()-1))), false
 	case "left", "h":
-		m.col, m.isConfirmingQuit = clampDown(cursorPos(m.col)), false
+		m.col, m.isConfirmingQuit = int(clampDown(cursorPos(m.col))), false
 	case "right", "l":
-		m.col, m.isConfirmingQuit = clampUp(cursorPos(m.col), cursorPos(m.width()-1)), false
+		m.col, m.isConfirmingQuit = int(clampUp(cursorPos(m.col), cursorPos(m.width()-1))), false
 	default:
 		return m, false
 	}
@@ -106,9 +101,7 @@ func (m Model) move(key string) (Model, bool) {
 func (m Model) command(key string) (Model, tea.Cmd) {
 	switch key {
 	case keyEnter, "i":
-		return m.beginCellEdit(), nil
-	case "t":
-		m.mode, m.buffer, m.status, m.isConfirmingQuit = modeTemplate, m.state.Template, helpTemplate, false
+		m.mode, m.buffer, m.status, m.isConfirmingQuit = modeEdit, m.sourceAt(m.row, m.col), helpEdit, false
 		return m, nil
 	case "ctrl+s":
 		return m.doSave(), nil
@@ -118,17 +111,6 @@ func (m Model) command(key string) (Model, tea.Cmd) {
 		m.isConfirmingQuit = false
 		return m, nil
 	}
-}
-
-// beginCellEdit enters cell-edit mode on an editable cell, or reports that the
-// current cell is computed.
-func (m Model) beginCellEdit() Model {
-	if !m.editable(m.row, m.col) {
-		m.status, m.isConfirmingQuit = "That cell is computed — edit a data cell (unshaded).", false
-		return m
-	}
-	m.mode, m.buffer, m.status, m.isConfirmingQuit = modeCell, m.dataValue(m.row, m.col), helpCell, false
-	return m
 }
 
 // quit exits, warning once when there are unsaved changes.
@@ -141,61 +123,30 @@ func (m Model) quit() (Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-// helpCell and helpTemplate are the edit-mode hints.
-const (
-	helpCell     = "type value · enter commit · esc cancel"
-	helpTemplate = "edit template · enter newline · ctrl+d apply · esc cancel"
-)
-
-// keyCell handles cell-edit keys.
-func (m Model) keyCell(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+// keyEdit handles cell-edit keys.
+func (m Model) keyEdit(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key.String() {
 	case keyEnter:
-		return m.commitCell(), nil
+		return m.commit(), nil
 	case keyEsc:
 		return m.toNav(), nil
 	default:
-		m.buffer = editBuffer(editText(m.buffer), key)
+		m.buffer = string(editBuffer(editText(m.buffer), key))
 		return m, nil
 	}
 }
 
-// commitCell writes the buffer to the current data cell and returns to nav.
-// beginCellEdit only enters cell mode on an editable, non-negative data cell,
-// and the cursor is clamped to the grid, so SetDataCell cannot fail here — the
-// error is provably nil and deliberately not branched on.
-func (m Model) commitCell() Model {
-	_ = m.session.SetDataCell(sheet.Address{Row: m.row, Col: m.col}, m.buffer)
-	return m.refreshedNav()
-}
-
-// keyTemplate handles template-edit keys.
-func (m Model) keyTemplate(key tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch key.String() {
-	case "ctrl+d":
-		return m.applyTemplate(), nil
-	case keyEsc:
-		return m.toNav(), nil
-	case keyEnter:
-		m.buffer += "\n"
-		return m, nil
-	default:
-		m.buffer = editBuffer(editText(m.buffer), key)
-		return m, nil
-	}
-}
-
-// applyTemplate replaces the template, staying in template mode on error so the
-// buffer is not lost.
-func (m Model) applyTemplate() Model {
-	if err := m.session.SetTemplate([]byte(m.buffer)); err != nil {
+// commit writes the buffer to the selected cell. A malformed formula keeps the
+// model in edit mode (buffer preserved) and shows the error.
+func (m Model) commit() Model {
+	if err := m.session.SetCell(sheet.Address{Row: m.row, Col: m.col}, m.buffer); err != nil {
 		m.status = err.Error()
 		return m
 	}
 	return m.refreshedNav()
 }
 
-// doSave persists the worksheet, reporting the outcome.
+// doSave persists the spreadsheet, reporting the outcome.
 func (m Model) doSave() Model {
 	if err := m.save(); err != nil {
 		m.status = err.Error()
@@ -219,37 +170,37 @@ func (m Model) refreshedNav() Model {
 }
 
 // editBuffer applies a printable key or backspace to an edit buffer.
-func editBuffer(buffer editText, key tea.KeyMsg) string {
+func editBuffer(buffer editText, key tea.KeyMsg) editText {
 	if key.Type == tea.KeyBackspace {
 		return trimLastRune(buffer)
 	}
 	if key.Type == tea.KeyRunes || key.Type == tea.KeySpace {
-		return string(buffer) + string(key.Runes)
+		return buffer + editText(key.Runes)
 	}
-	return string(buffer)
+	return buffer
 }
 
 // trimLastRune drops the last rune of s.
-func trimLastRune(s editText) string {
+func trimLastRune(s editText) editText {
 	runes := []rune(s)
 	if len(runes) == 0 {
-		return string(s)
+		return s
 	}
-	return string(runes[:len(runes)-1])
+	return editText(runes[:len(runes)-1])
 }
 
 // clampDown decrements toward zero.
-func clampDown(v cursorPos) int {
+func clampDown(v cursorPos) cursorPos {
 	if v <= 0 {
 		return 0
 	}
-	return int(v - 1)
+	return v - 1
 }
 
 // clampUp increments toward the maximum.
-func clampUp(v, limit cursorPos) int {
+func clampUp(v, limit cursorPos) cursorPos {
 	if v >= limit {
-		return int(limit)
+		return limit
 	}
-	return int(v + 1)
+	return v + 1
 }

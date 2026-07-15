@@ -30,16 +30,15 @@ func TestRunTUI_LoadsAndRuns(t *testing.T) {
 		return nil
 	})
 
-	tmpl, data := worksheetFiles(t)
 	streams := Streams{In: strings.NewReader(""), Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	require.NoError(t, runTUI(streams, tuiConfig{template: tmpl, data: data}))
+	require.NoError(t, runTUI(streams, tuiConfig{source: sheetFile(t)}))
 	assert.NotNil(t, gotModel)
 }
 
-func TestRunTUI_RequiresFiles(t *testing.T) {
+func TestRunTUI_RequiresFile(t *testing.T) {
 	t.Parallel()
 
-	err := runTUI(Streams{In: strings.NewReader("")}, tuiConfig{template: "-", data: "-"})
+	err := runTUI(Streams{In: strings.NewReader("")}, tuiConfig{source: "-"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }
@@ -49,17 +48,15 @@ func TestRunTUI_ProgramError(t *testing.T) {
 		return errors.New("tea boom")
 	})
 
-	tmpl, data := worksheetFiles(t)
-	err := runTUI(Streams{In: strings.NewReader(""), Out: &bytes.Buffer{}}, tuiConfig{template: tmpl, data: data})
+	err := runTUI(Streams{In: strings.NewReader(""), Out: &bytes.Buffer{}}, tuiConfig{source: sheetFile(t)})
 	require.Error(t, err)
 }
 
 func TestTUICommand_Integration(t *testing.T) {
 	withRunProgram(t, func(tea.Model, io.Reader, io.Writer) error { return nil })
 
-	tmpl, data := worksheetFiles(t)
 	cmd := tuiCommand()
-	err := cmd.Run(context.Background(), []string{cmdTUI, string(tmpl), string(data)})
+	err := cmd.Run(context.Background(), []string{cmdTUI, string(sheetFile(t))})
 	require.NoError(t, err)
 }
 
@@ -67,7 +64,6 @@ func TestDefaultRunProgram_QuitsOnInput(t *testing.T) {
 	// Drive the real (unswapped) runProgram headlessly: feed "q" so the model
 	// quits and Run returns, exercising the default tea.Program path without a
 	// TTY.
-	tmpl, data := worksheetFiles(t)
 	streams := Streams{In: strings.NewReader("q"), Out: io.Discard, Err: io.Discard}
-	require.NoError(t, runTUI(streams, tuiConfig{template: tmpl, data: data}))
+	require.NoError(t, runTUI(streams, tuiConfig{source: sheetFile(t)}))
 }

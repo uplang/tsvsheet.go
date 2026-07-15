@@ -1,18 +1,13 @@
 package tui
 
-// width is the number of columns to display: the widest of the data and
-// computed grids, at least one so the cursor always has a column.
+// width is the number of columns to display, at least one so the cursor always
+// has a column. The computed grid mirrors the source grid's shape, so either
+// gives the column count.
 func (m Model) width() int {
-	w := dataWidth(m.state.Data)
-	for _, row := range m.state.Computed {
-		if len(row) > w {
-			w = len(row)
-		}
+	if w := gridWidth(m.state.Computed); w > 0 {
+		return w
 	}
-	if w == 0 {
-		return 1
-	}
-	return w
+	return 1
 }
 
 // height is the number of rows to display, at least one.
@@ -23,8 +18,8 @@ func (m Model) height() int {
 	return 1
 }
 
-// dataWidth is the widest row of a grid.
-func dataWidth(g [][]string) int {
+// gridWidth is the widest row of a grid.
+func gridWidth(g [][]string) int {
 	w := 0
 	for _, row := range g {
 		if len(row) > w {
@@ -34,20 +29,14 @@ func dataWidth(g [][]string) int {
 	return w
 }
 
-// editable reports whether (row, col) is a raw data cell (not a computed-only
-// cell), and therefore editable.
-func (m Model) editable(row, col int) bool {
-	return row < len(m.state.Data) && col < dataWidth(m.state.Data)
-}
-
-// dataValue returns the raw data value at (row, col), or empty when absent.
-func (m Model) dataValue(row, col int) string {
-	return cellAt(m.state.Data, cursorPos(row), cursorPos(col))
-}
-
-// computedValue returns the computed value at (row, col), or empty when absent.
-func (m Model) computedValue(row, col int) string {
+// computedAt returns the computed value at (row, col), or empty when absent.
+func (m Model) computedAt(row, col int) string {
 	return cellAt(m.state.Computed, cursorPos(row), cursorPos(col))
+}
+
+// sourceAt returns the source text at (row, col), or empty when absent.
+func (m Model) sourceAt(row, col int) string {
+	return cellAt(m.state.Source, cursorPos(row), cursorPos(col))
 }
 
 // cellAt reads a grid cell, returning empty for any out-of-bounds position.

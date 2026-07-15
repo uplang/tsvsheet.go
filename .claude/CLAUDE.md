@@ -1,8 +1,10 @@
 # tsvsheet.go
 
-> **A spreadsheet for plain text.** The Go implementation of [tsvsheet](https://github.com/uplang/tsvsheet): compute a `.tsvt` template (headers, formulas, sheet operations) over a `.tsv` value grid, and edit the two-file worksheet from the CLI, the browser, or the terminal — all through one engine.
+> **A spreadsheet for plain text.** The Go implementation of [tsvsheet](https://github.com/uplang/tsvsheet): a `.tsvt` **is** the spreadsheet — a single TAB-separated grid whose cells are literal values or `=formulas` that address other cells in A1 notation (`B2`, `D2:D5`), computed in place — editable from the CLI, the browser, or the terminal, all through one engine.
 
-This is the CLI/library implementation repo (module `github.com/uplang/tsvsheet.go`, binary `cmd/tsvsheet/`). The normative language is the grammar repo [uplang/tsvsheet](https://github.com/uplang/tsvsheet); this repo lifts its ANTLR-generated Go parser and layers the semantics. See [specs/](../specs/) — the decomposed SDD specs, the `engine-api` contract, and [ADR 0003](../specs/decisions/0003-open-semantics.md), which pins every choice made for a SPECIFICATION `[open]` item and records grammar consequences discovered while implementing.
+This is the CLI/library implementation repo (module `github.com/uplang/tsvsheet.go`, binary `cmd/tsvsheet/`). It lifts the grammar repo's ANTLR-generated Go parser and reuses only its **expression sublanguage** (via `tsvt.ParseFormula`) to compile each cell's formula; the surrounding **A1 single-file spreadsheet model is layered here**.
+
+> **Model pivot (in progress).** The repo was reoriented from the salvaged 2011 two-file worksheet (a `.tsvt` template of `=header`/`=body`/`=final` sections over a companion `.tsv` grid) to the single-file A1 spreadsheet above. The engine, session, all commands, the browser editor, and the TUI now implement the A1 model. The **grammar and the [specs/](../specs/) capability docs/ADRs still describe the two-file worksheet** — folding the A1 redefinition back into `SPECIFICATION.md` (grammar repo) and these specs is a deliberate later step. Until then, prefer this file and the shipped code over the two-file specs where they disagree. Two known consequences of the pivot: the grammar's full §5 reference algebra and worksheet parser (`tsvt.Parse`, `internal/tsvt/build.go`) are retained as the covered grammar seam but unused by the app (pruned at the fold-back); and a quoted string in a formula (`"Pass"`) still parses as a named-column reference and resolves to `#REF!` — text-valued formulas are a known gap.
 
 ## Architecture — one engine, three frontends
 
@@ -10,7 +12,7 @@ Every frontend consumes the same engine; none re-implements parsing or evaluatio
 
 - `src/grammar/tsvsheet` — the committed ANTLR-generated parser (package `tsvsheetgrammar`, `// Code generated … DO NOT EDIT`). Regenerate with `make go` in the grammar repo and copy `gen/go/*.go` here; excluded from the gates via [Makefile.local](../Makefile.local).
 - `internal/tsvt` — the covered seam over the generated parser: source → immutable typed AST, or `constants.ErrSyntax`. No ANTLR type escapes this package.
-- `internal/sheet` — the §9 processor: grid I/O, the §5 reference resolver, the §11 evaluator with error values, header/body/final phases, structural ops, `Check` diagnostics, `Explain` traces.
+- `internal/sheet` — the A1 spreadsheet engine: grid I/O, A1 reference resolution, the §11 expression evaluator with error values (`#REF!`/`#DIV/0!`/`#CIRC!`), dependency-ordered memoized `Compute`, immutable `Set`, `Check` diagnostics, `Explain` traces.
 - `internal/session` — the one mutable editing model (the repo's sole pointer-receiver type), backing serve and tui.
 - `internal/cli` — urfave/cli v3 commands: `render` `parse` `check` `explain` `serve` `tui`, unix stdin/stdout discipline.
 - `internal/serve` — HTTP JSON API + embedded browser spreadsheet (`go:embed`, thin client of the session).

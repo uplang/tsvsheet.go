@@ -1,7 +1,6 @@
-=header(1)
 Item	Qty	Price	Amount
-=body
-D=B * C
-=final
-A$+1=Total
-D$=sum(D$1:D$4)
+Widget	3	4.50	=B2*C2
+Gadget	2	12.00	=B3*C3
+Gizmo	5	2.25	=B4*C4
+Sprocket	10	0.99	=B5*C5
+Total			=sum(D2:D5)

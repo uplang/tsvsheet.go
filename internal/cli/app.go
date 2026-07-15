@@ -10,24 +10,24 @@ import (
 
 const (
 	name        = "tsvsheet"
-	usage       = "A spreadsheet for plain text: compute .tsvt templates over .tsv data."
-	description = `tsvsheet computes a .tsvt template (headers, formulas, sheet operations)
-against a .tsv value grid and emits the computed sheet — a two-file worksheet
-kept diffable as text.
+	usage       = "A spreadsheet for plain text: a .tsvt grid of values and =formulas."
+	description = `tsvsheet computes a .tsvt spreadsheet — a TAB-separated grid whose cells are
+literal values or =formulas that address other cells in A1 notation (B2,
+D2:D4) — and emits the computed grid, kept diffable as text.
 
-Inputs are positional: template first, then data. An omitted input is read
-from stdin.
+The sheet is a positional argument; an omitted sheet (or "-") is read from
+stdin.
 
 Commands:
-  render  <template> <data>          Compute a worksheet, write TSV to stdout
-  parse   <template>                 Emit a template's structure as JSON
-  check   <template>                 Validate (exit 0 clean / 1 diags / 2 syntax)
-  explain <cell> <template> <data>   Trace how one computed cell was produced
-  serve   <template> <data>          Browser spreadsheet editor for a worksheet
-  tui     <template> <data>          Terminal spreadsheet editor
+  render  <sheet>          Compute a spreadsheet, write TSV to stdout
+  parse   <sheet>          Emit a sheet's cells as JSON
+  check   <sheet>          Validate (exit 0 clean / 1 diags / 2 syntax)
+  explain <cell> <sheet>   Trace how one computed cell was produced
+  serve   <sheet>          Browser spreadsheet editor
+  tui     <sheet>          Terminal spreadsheet editor
 
 Non-interactive commands write to stdout, so they compose in unix pipelines:
-  tsvsheet render sheet.tsvt sheet.tsv | column -t
+  tsvsheet render sheet.tsvt | column -t
   cat sheet.tsvt | tsvsheet check`
 )
 
@@ -47,6 +47,10 @@ const (
 	cmdServe   = "serve"
 	cmdTUI     = "tui"
 )
+
+// argSheetOptional is the ArgsUsage for commands whose sheet argument may be
+// omitted to read stdin.
+const argSheetOptional = "[sheet]"
 
 // Version is a build version string, supplied by main (ldflags -X) and threaded
 // into the command rather than held in a package-level variable.

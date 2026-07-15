@@ -2,6 +2,7 @@ package cli
 
 import (
 	"io"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -18,27 +19,31 @@ var runProgram = func(model tea.Model, in io.Reader, out io.Writer) error {
 	return err
 }
 
-// runTUI loads the worksheet into a session and edits it in the terminal UI.
-// Both template and data must be files — the TUI saves edits back to them.
+// runTUI loads the spreadsheet into a session and edits it in the terminal UI.
+// The sheet must be a file — the TUI saves edits back to it.
 func runTUI(streams Streams, cfg tuiConfig) error {
-	sess, persist, err := loadEditable(cfg.template, cfg.data)
+	sess, persist, err := loadEditable(cfg.source)
 	if err != nil {
 		return err
 	}
 	return runProgram(tui.New(sess, tui.Saver(persist)), streams.In, streams.Out)
 }
 
-// loadEditable reads a file-backed worksheet into a session and returns it with
-// a persist function that writes edits back to those files. Shared by serve and
-// tui, both of which require file sources so edits can be saved.
-func loadEditable(template, data sourcePath) (*session.Session, func() error, error) {
-	if template.isStdin() || data.isStdin() {
-		const msg = "requires a template and a data file path (e.g. `tsvsheet serve sheet.tsvt sheet.tsv`)"
+// loadEditable reads a file-backed spreadsheet into a session and returns it
+// with a persist function that writes edits back to that file. Shared by serve
+// and tui, both of which require a file source so edits can be saved.
+func loadEditable(source sourcePath) (*session.Session, func() error, error) {
+	if source.isStdin() {
+		const msg = "requires a spreadsheet file path (e.g. `tsvsheet serve sheet.tsvt`)"
 		return nil, nil, constants.ErrInvalidValue.With(nil, "message", msg)
 	}
-	sess, err := loadSession(template, data)
+	src, err := os.ReadFile(string(source))
+	if err != nil {
+		return nil, nil, constants.ErrOpenFile.With(err, string(source))
+	}
+	sess, err := session.New(src)
 	if err != nil {
 		return nil, nil, err
 	}
-	return sess, saver(sess, template, data), nil
+	return sess, saver(sess, source), nil
 }

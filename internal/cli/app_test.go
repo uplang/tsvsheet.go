@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -49,39 +47,37 @@ func TestCommand_HasAllCommands(t *testing.T) {
 }
 
 func TestCLI_Render(t *testing.T) {
-	tmplPath := filepath.Join(t.TempDir(), "t.tsvt")
-	require.NoError(t, os.WriteFile(tmplPath, []byte(sampleTemplate), 0o600))
-	withStdin(t, sampleData) // data piped on stdin
-
-	out, err := runCLI(t, "render", tmplPath) // template positional, data from stdin
+	path := writeTemp(t, "s.tsvt", sampleSheet)
+	out, err := runCLI(t, "render", path)
 	require.NoError(t, err)
-	assert.Contains(t, out, "\t7\n")
+	assert.Contains(t, out, "\t5\n")
+}
+
+func TestCLI_RenderStdin(t *testing.T) {
+	withStdin(t, sampleSheet)
+	out, err := runCLI(t, "render") // omitted sheet → stdin
+	require.NoError(t, err)
+	assert.Contains(t, out, "\t9\n")
 }
 
 func TestCLI_Parse(t *testing.T) {
-	withStdin(t, "=body\nE=C + D\n")
+	withStdin(t, sampleSheet)
 	out, err := runCLI(t, "parse")
 	require.NoError(t, err)
-	assert.Contains(t, out, `"kind": "body"`)
+	assert.Contains(t, out, `"formula": true`)
 }
 
 func TestCLI_CheckClean(t *testing.T) {
-	withStdin(t, "=body\nE=C + D\n")
+	withStdin(t, sampleSheet)
 	_, err := runCLI(t, cmdCheck)
 	require.NoError(t, err)
 }
 
 func TestCLI_ExplainCell(t *testing.T) {
-	t.Parallel()
-
-	dataPath := filepath.Join(t.TempDir(), "d.tsv")
-	require.NoError(t, os.WriteFile(dataPath, []byte(sampleData), 0o600))
-	tmplPath := filepath.Join(t.TempDir(), "t.tsvt")
-	require.NoError(t, os.WriteFile(tmplPath, []byte("=body\nE=C + D\n"), 0o600))
-
-	out, err := runCLI(t, "explain", "E2", tmplPath, dataPath)
+	path := writeTemp(t, "s.tsvt", sampleSheet)
+	out, err := runCLI(t, "explain", "C1", path)
 	require.NoError(t, err)
-	assert.Contains(t, out, "E2 = 9")
+	assert.Contains(t, out, "C1 = 5")
 }
 
 func TestPositional(t *testing.T) {
@@ -109,7 +105,7 @@ func TestRun_ExitCodes(t *testing.T) {
 	stderr = io.Discard
 	t.Cleanup(func() { stderr = prevStderr })
 
-	withStdin(t, "=sum(")
+	withStdin(t, "1\t=sum(\n")
 	assert.Equal(t, exitSyntaxError, Run(context.Background(), "test", []string{name, cmdCheck}))
 }
 
@@ -144,26 +140,20 @@ func TestRunParse_ReadError(t *testing.T) {
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
 
-func TestRunRender_DataReadError(t *testing.T) {
+func TestRunRender_ReadError(t *testing.T) {
 	t.Parallel()
 
-	tmplPath := filepath.Join(t.TempDir(), "t.tsvt")
-	require.NoError(t, os.WriteFile(tmplPath, []byte(sampleTemplate), 0o600))
-
 	streams := Streams{In: failReader{}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	err := runRender(streams, sourcePath(tmplPath), "-")
+	err := runRender(streams, "-")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
 
-func TestRunExplain_DataReadError(t *testing.T) {
+func TestRunExplain_ReadError(t *testing.T) {
 	t.Parallel()
 
-	tmplPath := filepath.Join(t.TempDir(), "t.tsvt")
-	require.NoError(t, os.WriteFile(tmplPath, []byte("=body\nE=C\n"), 0o600))
-
 	streams := Streams{In: failReader{}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	err := runExplain(streams, explainConfig{template: sourcePath(tmplPath), data: "-", cell: "A1"})
+	err := runExplain(streams, explainConfig{source: "-", cell: "A1"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }

@@ -9,17 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/uplang/tsvsheet.go/internal/session"
-	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
-var (
-	sampleData     = sheet.Grid{{"1", "2", "3", "4"}, {"2", "3", "4", "5"}, {"3", "4", "5", "6"}}
-	sampleTemplate = []byte("=body\nE=C + D\n")
+// sampleSheet is a small spreadsheet whose D column holds a formula, so the
+// grid exercises both literal and formula cell styling.
+var sampleSheet = []byte(
+	"name\t2\t3\t=B1+C1\n" +
+		"Bob\t4\t5\t=B2+C2\n",
 )
 
 func newModel(t *testing.T, save Saver) Model {
 	t.Helper()
-	s, err := session.New(sampleTemplate, sampleData)
+	s, err := session.New(sampleSheet)
 	require.NoError(t, err)
 	return New(s, save)
 }
@@ -52,8 +53,6 @@ func keyMsg(key string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
 	case "ctrl+s":
 		return tea.KeyMsg{Type: tea.KeyCtrlS}
-	case "ctrl+d":
-		return tea.KeyMsg{Type: tea.KeyCtrlD}
 	case "ctrl+c":
 		return tea.KeyMsg{Type: tea.KeyCtrlC}
 	default:
@@ -93,24 +92,33 @@ func TestNavigation_ClampsAtEdges(t *testing.T) {
 	assert.Equal(t, m.width()-1, m.col)
 }
 
-func TestEditDataCell(t *testing.T) {
+func TestEditCell_Literal(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
-	m = press(t, m, "enter") // edit A1
-	assert.Equal(t, modeCell, m.mode)
+	m = press(t, m, "right") // B1 (a literal "2")
+	m = press(t, m, "enter") // edit
+	assert.Equal(t, modeEdit, m.mode)
 
-	m = press(t, m, "backspace") // clear "1"
+	m = press(t, m, "backspace") // clear "2"
 	m = press(t, m, "9")
 	m = press(t, m, "enter") // commit
 	assert.Equal(t, modeNav, m.mode)
 
 	state := m.state
-	assert.Equal(t, "9", state.Data[0][0])
+	assert.Equal(t, "9", state.Source[0][1])
 	assert.True(t, state.IsDirty)
 }
 
-func TestEditDataCell_Space(t *testing.T) {
+func TestEditCell_EntersWithI(t *testing.T) {
+	t.Parallel()
+
+	m := press(t, newModel(t, nil), "i")
+	assert.Equal(t, modeEdit, m.mode)
+	assert.Equal(t, "name", m.buffer) // seeded with the cell's source
+}
+
+func TestEditCell_Space(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
@@ -119,7 +127,7 @@ func TestEditDataCell_Space(t *testing.T) {
 	assert.Contains(t, m.buffer, " ")
 }
 
-func TestEditDataCell_Cancel(t *testing.T) {
+func TestEditCell_Cancel(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
@@ -127,73 +135,31 @@ func TestEditDataCell_Cancel(t *testing.T) {
 	m = press(t, m, "5")
 	m = press(t, m, "esc") // cancel
 	assert.Equal(t, modeNav, m.mode)
-	assert.Equal(t, "1", m.state.Data[0][0]) // unchanged
+	assert.Equal(t, "name", m.state.Source[0][0]) // unchanged
 }
 
-func TestEdit_ComputedCellRejected(t *testing.T) {
+func TestEditCell_FormulaSyntaxErrorStaysEditing(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
-	m = press(t, m, "right") // B
-	m = press(t, m, "right") // C
-	m = press(t, m, "right") // D
-	m = press(t, m, "right") // E (computed)
 	m = press(t, m, "enter")
-	assert.Equal(t, modeNav, m.mode)
-	assert.Contains(t, m.status, "computed")
-}
-
-func TestEditTemplate(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, nil)
-	m = press(t, m, "t")
-	assert.Equal(t, modeTemplate, m.mode)
-	assert.Equal(t, string(sampleTemplate), m.buffer)
-
-	// Append a new final line and apply.
-	for _, r := range "\n=final" {
-		if r == '\n' {
-			m = press(t, m, "enter")
-		} else {
-			m = press(t, m, string(r))
-		}
-	}
-	m = press(t, m, "ctrl+d") // apply
-	assert.Equal(t, modeNav, m.mode)
-}
-
-func TestEditTemplate_SyntaxErrorStays(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, nil)
-	m = press(t, m, "t")
-	// Replace buffer with invalid syntax.
-	m.buffer = "=sum("
-	m = press(t, m, "ctrl+d")
-	assert.Equal(t, modeTemplate, m.mode) // stays so the buffer is not lost
+	m.buffer = "=sum(" // a malformed formula
+	m = press(t, m, "enter")
+	assert.Equal(t, modeEdit, m.mode) // stays so the buffer is not lost
 	assert.NotEmpty(t, m.status)
 }
 
-func TestEditTemplate_Cancel(t *testing.T) {
+func TestEditBuffer_UnhandledAndEmptyBackspace(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
-	m = press(t, m, "t")
-	m = press(t, m, "x")
-	m = press(t, m, "esc")
-	assert.Equal(t, modeNav, m.mode)
-	assert.Equal(t, string(sampleTemplate), m.state.Template) // unchanged
-}
-
-func TestEditTemplate_Backspace(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, nil)
-	m = press(t, m, "t")
-	before := m.buffer
-	m = press(t, m, "backspace")
-	assert.Equal(t, before[:len(before)-1], m.buffer)
+	m = press(t, m, "right") // B1, buffer seed "2"
+	m = press(t, m, "enter")
+	m = press(t, m, "backspace") // ""
+	m = press(t, m, "backspace") // backspace on empty → no-op
+	assert.Empty(t, m.buffer)
+	m = press(t, m, "up") // unhandled key in edit mode → buffer unchanged
+	assert.Empty(t, m.buffer)
 }
 
 func TestSave(t *testing.T) {
@@ -215,12 +181,10 @@ func TestSave(t *testing.T) {
 func TestSave_Error(t *testing.T) {
 	t.Parallel()
 
-	m := newModel(t, func() error { return assertErr })
+	m := newModel(t, func() error { return &testError{"save boom"} })
 	m = press(t, m, "ctrl+s")
 	assert.Contains(t, m.status, "save boom")
 }
-
-var assertErr = &testError{"save boom"}
 
 type testError struct{ msg string }
 
@@ -253,7 +217,7 @@ func TestQuit_DirtyWarnsThenQuits(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
-func TestQuit_DirtyThenOtherKeyResets(t *testing.T) {
+func TestQuit_DirtyThenMovementResets(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
@@ -263,16 +227,24 @@ func TestQuit_DirtyThenOtherKeyResets(t *testing.T) {
 	m = press(t, m, "q")    // warn
 	m = press(t, m, "down") // movement resets confirm
 	assert.False(t, m.isConfirmingQuit)
+}
 
-	// A clean model quits immediately on q (no confirm needed).
-	assert.True(t, press(t, newModel(t, nil), "q").isQuitting)
+func TestQuit_CtrlCOnDirty(t *testing.T) {
+	t.Parallel()
 
-	m = newModel(t, nil)
+	m := newModel(t, nil)
 	m = press(t, m, "enter")
 	m = press(t, m, "9")
 	m = press(t, m, "enter")
 	m = press(t, m, "q")      // warn
 	m = press(t, m, "ctrl+c") // ctrl+c after warn → quits
+	assert.True(t, m.isQuitting)
+}
+
+func TestQuit_EscQuitsClean(t *testing.T) {
+	t.Parallel()
+
+	m := press(t, newModel(t, nil), "esc")
 	assert.True(t, m.isQuitting)
 }
 
@@ -300,17 +272,16 @@ func TestInit(t *testing.T) {
 	assert.Nil(t, newModel(t, nil).Init())
 }
 
-func TestView_Modes(t *testing.T) {
+func TestView_NavAndEdit(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, nil)
-	assert.Contains(t, stripANSI(m.View()), "tsvsheet")
+	view := stripANSI(m.View())
+	assert.Contains(t, view, "tsvsheet")
+	assert.Contains(t, view, "A1:") // formula bar addresses the cursor
 
 	editing := press(t, m, "enter")
-	assert.Contains(t, stripANSI(editing.View()), "»") // cell buffer shown
-
-	tmpl := press(t, m, "t")
-	assert.Contains(t, stripANSI(tmpl.View()), "=body") // template pane
+	assert.Contains(t, stripANSI(editing.View()), "▏") // edit caret in the formula bar
 
 	quit := press(t, m, "q")
 	assert.Empty(t, quit.View())
@@ -319,51 +290,38 @@ func TestView_Modes(t *testing.T) {
 func TestView_DirtyAndDiagnostics(t *testing.T) {
 	t.Parallel()
 
-	s, err := session.New([]byte("=body\nZ=bogus(A)\n"), sampleData) // unknown func → diagnostic
+	s, err := session.New([]byte("=bogus(A1)\n")) // unknown func → diagnostic
 	require.NoError(t, err)
 	m := New(s, nil)
-	view := stripANSI(m.View())
-	assert.Contains(t, view, "diagnostic")
+	assert.Contains(t, stripANSI(m.View()), "diagnostic")
 
 	m = press(t, m, "enter")
-	m = press(t, m, "9")
+	m.buffer = "9" // replace the formula with a literal
 	m = press(t, m, "enter")
 	assert.Contains(t, stripANSI(m.View()), "unsaved")
 }
 
-func TestView_ErrorAndLongValues(t *testing.T) {
+func TestView_ErrorCircAndLongValues(t *testing.T) {
 	t.Parallel()
 
-	// A formula producing #REF! and a long literal exercise error and clip
-	// styling.
-	s, err := session.New([]byte("=body\nE=C9\nF=1234567890\n"), sampleData)
+	// #REF!, #CIRC!, and a long literal exercise the error and clip styling.
+	s, err := session.New([]byte("=Z99\t=A2+1\t1234567890\n=B1+1\t5\t6\n"))
 	require.NoError(t, err)
 	view := stripANSI(New(s, nil).View())
 	assert.Contains(t, view, "#REF!")
+	assert.Contains(t, view, "#CIRC!")
 	assert.Contains(t, view, "…") // clipped long value
 }
 
 func TestEmptyGrid(t *testing.T) {
 	t.Parallel()
 
-	s, err := session.New([]byte("=body\n"), sheet.Grid{})
+	s, err := session.New([]byte(""))
 	require.NoError(t, err)
 	m := New(s, nil)
 	assert.Equal(t, 1, m.width())
 	assert.Equal(t, 1, m.height())
 	assert.NotEmpty(t, stripANSI(m.View()))
-}
-
-func TestEditBuffer_UnhandledAndEmptyBackspace(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, nil)
-	m = press(t, m, "enter")     // edit A1, buffer "1"
-	m = press(t, m, "backspace") // ""
-	m = press(t, m, "backspace") // backspace on empty → no-op
-	assert.Empty(t, m.buffer)
-	m = press(t, m, "left") // unhandled key in cell mode → buffer unchanged
-	assert.Empty(t, m.buffer)
 }
 
 func TestHelpers(t *testing.T) {

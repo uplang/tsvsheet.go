@@ -2,36 +2,89 @@ package sheet
 
 import "github.com/uplang/tsvsheet.go/internal/tsvt"
 
-// resolver resolves references against a grid at a current body row. row is -1
-// in a no-row context (final phase or a template with no data rows), where only
-// absolute rows resolve. width is the logical column width (data width adjusted
-// by structural ops, ADR 0003 rule 19), so columns computed to the right do not
-// change what `$` (last column) and negative indices mean.
+// cellPhase tracks a cell's evaluation state for memoization and cycle
+// detection.
+type cellPhase int
+
+const (
+	phaseUnvisited cellPhase = iota
+	phaseVisiting            // on the current evaluation stack → a cycle
+	phaseDone
+)
+
+// computer memoizes cell values as they are evaluated in dependency order. Its
+// cache and phase slices are allocated once and shared, so value-receiver
+// methods mutate them in place (no reassignment) and every recursive read sees
+// the same state.
+type computer struct {
+	sheet Sheet
+	cache [][]Value
+	phase [][]cellPhase
+}
+
+// newComputer builds a computer sized to the sheet.
+func newComputer(s Sheet) computer {
+	cache := make([][]Value, len(s.cells))
+	phase := make([][]cellPhase, len(s.cells))
+	for r, row := range s.cells {
+		cache[r] = make([]Value, len(row))
+		phase[r] = make([]cellPhase, len(row))
+	}
+	return computer{sheet: s, cache: cache, phase: phase}
+}
+
+// output is a cell's rendered value: a literal verbatim, a formula computed.
+func (c computer) output(row rowIndex, col colIndex, cl cell) textVal {
+	if !cl.isFormula() {
+		return textVal(cl.text)
+	}
+	return textVal(c.read(row, col).String())
+}
+
+// read returns the value at (row, col), evaluating and memoizing it on first
+// visit. A cell already on the evaluation stack is a circular reference; an
+// out-of-grid position is #REF!.
+func (c computer) read(row rowIndex, col colIndex) Value {
+	cl, inGrid := c.sheet.at(row, col)
+	if !inGrid {
+		return errorValue(ErrRef)
+	}
+	switch c.phase[row][col] {
+	case phaseDone:
+		return c.cache[row][col]
+	case phaseVisiting:
+		return errorValue(ErrCirc)
+	}
+	c.phase[row][col] = phaseVisiting
+	result := c.evalCell(cl)
+	c.cache[row][col] = result
+	c.phase[row][col] = phaseDone
+	return result
+}
+
+// evalCell evaluates one cell: a literal parses to its value, a formula
+// evaluates its expression (which reads other cells).
+func (c computer) evalCell(cl cell) Value {
+	if !cl.isFormula() {
+		return value(textVal(cl.text))
+	}
+	return resolver{comp: c}.eval(cl.formula)
+}
+
+// resolver evaluates expressions against the computer, resolving A1 references.
 type resolver struct {
-	names map[string]int
-	grid  Grid
-	row   int
-	width int
+	comp computer
 }
 
-// colRes is the outcome of resolving a column: a real index, or an unbound
-// named column carried as name for the string-literal fallback (ADR 0003
-// rule 16).
-type colRes struct {
-	name  string
-	index int
-	isOK  bool
-}
-
-// cellset is a resolved reference as an operand: the resolved cell values and
-// whether it was a single cell (a range/matrix is not single).
+// cellset is a resolved reference: the referenced cells' values, and whether it
+// was a single cell (a range is not single).
 type cellset struct {
 	values   []Value
-	isSingle bool
+	isSingle boolResult
 }
 
 // scalar reduces a cellset to one value: a single cell is its value; a
-// multi-cell range used where a scalar is required is #VALUE! (ADR 0003 rule 8).
+// multi-cell range used where a scalar is required is #VALUE!.
 func (c cellset) scalar() Value {
 	if c.isSingle && len(c.values) == 1 {
 		return c.values[0]
@@ -39,206 +92,108 @@ func (c cellset) scalar() Value {
 	return errorValue(ErrValue)
 }
 
-// resolveColumn resolves a column reference to an index against the grid width.
-func (r resolver) resolveColumn(col tsvt.Col) colRes {
-	switch c := col.(type) {
-	case tsvt.ColLetters:
-		return colRes{index: lettersToIndex(columnLetters(c.Name)), isOK: true}
-	case tsvt.ColIndex:
-		return colRes{index: normalizeIndex(colIndex(c.Index), colIndex(r.width)), isOK: true}
-	case tsvt.ColLast:
-		return colRes{index: r.width - 1, isOK: true}
-	case tsvt.ColNamed:
-		return r.resolveNamed(c.Name)
-	default: // tsvt.ColElided — invalid as an operand column
-		return colRes{isOK: false}
-	}
-}
-
-// resolveNamed looks up a header-bound column; an unbound name is carried for
-// the string-literal fallback.
-func (r resolver) resolveNamed(name string) colRes {
-	if index, found := r.names[name]; found {
-		return colRes{index: index, isOK: true}
-	}
-	return colRes{name: name}
-}
-
-// normalizeIndex maps a possibly-negative 0-based index to a concrete column,
-// counting negatives from the end (§5.1).
-func normalizeIndex(index, width colIndex) int {
-	if index < 0 {
-		return int(width + index)
-	}
-	return int(index)
-}
-
-// resolveRow resolves a row reference to a 0-based grid row. ok is false when
-// the reference cannot resolve in the current context (e.g. a relative row with
-// no current row), which the caller renders as #REF!.
-func (r resolver) resolveRow(row tsvt.RowRef) (int, bool) {
-	last := r.grid.rows() - 1
-	switch ref := row.(type) {
-	case nil:
-		return r.row, r.row >= 0
-	case tsvt.RowBefore:
-		return relativeRow(rowIndex(r.row), rowIndex(-ref.N))
-	case tsvt.RowAfter:
-		return relativeRow(rowIndex(r.row), rowIndex(ref.N))
-	case tsvt.RowAbs:
-		return ref.N - 1, true
-	case tsvt.RowLast:
-		return last + ref.Offset, true
-	case tsvt.RowFromEnd:
-		return r.grid.rows() - ref.N, true
-	default: // tsvt.RowAll — not a single row; invalid in scalar context
-		return 0, false
-	}
-}
-
-// relativeRow offsets the current row, reporting ok=false when there is no
-// current row (final phase).
-func relativeRow(current, delta rowIndex) (int, bool) {
-	if current < 0 {
-		return 0, false
-	}
-	return int(current + delta), true
-}
-
-// resolveOperand resolves a reference for use as an expression operand.
+// resolveOperand resolves a reference operand: a single A1 cell or an A1 range.
+// A grouped range is not part of the A1 model and resolves to a single #REF!.
 func (r resolver) resolveOperand(ref tsvt.Reference) cellset {
-	switch t := ref.(type) {
-	case tsvt.RangeRef:
-		return r.resolveRange(t)
-	default: // tsvt.GroupedRange
-		return r.resolveGrouped(t.(tsvt.GroupedRange))
-	}
-}
-
-// resolveRange resolves a single endpoint or a two-endpoint matrix.
-func (r resolver) resolveRange(ref tsvt.RangeRef) cellset {
-	if ref.To == nil {
-		return r.resolveEndpoint(ref.From)
-	}
-	return r.resolveMatrix(ref.From, ref.To)
-}
-
-// resolveEndpoint resolves one endpoint used alone: a single cell, or a whole
-// row when the column is elided (a row selector).
-func (r resolver) resolveEndpoint(ep tsvt.Endpoint) cellset {
-	switch e := ep.(type) {
-	case tsvt.CellEndpoint:
-		return cellset{values: []Value{r.resolveCell(e.Col, e.Row)}, isSingle: true}
-	default: // tsvt.RowSelector
-		return r.resolveRowSelector(ep.(tsvt.RowSelector))
-	}
-}
-
-// resolveCell resolves a single cell to a Value; an unbound named column is the
-// string literal of its name (ADR 0003 rule 16), an out-of-grid position is
-// #REF!.
-func (r resolver) resolveCell(col tsvt.Col, row tsvt.RowRef) Value {
-	cr := r.resolveColumn(col)
-	if !cr.isOK {
-		if cr.name != "" {
-			return stringValue(textVal(cr.name))
-		}
-		return errorValue(ErrRef)
-	}
-	rowIdx, ok := r.resolveRow(row)
+	rangeRef, ok := ref.(tsvt.RangeRef)
 	if !ok {
-		return errorValue(ErrRef)
+		return refError()
 	}
-	return r.read(rowIdx, cr.index)
+	if rangeRef.To == nil {
+		return r.resolveSingle(rangeRef.From)
+	}
+	return r.resolveMatrix(rangeRef.From, rangeRef.To)
 }
 
-// read returns the value at a resolved position, or #REF! when out of grid.
-func (r resolver) read(row, col int) Value {
-	raw, ok := r.grid.at(row, col)
+// refError is the #REF! result of an invalid single reference; isSingle so the
+// error propagates through scalar() rather than being masked as #VALUE!.
+func refError() cellset {
+	return cellset{values: []Value{errorValue(ErrRef)}, isSingle: true}
+}
+
+// resolveSingle resolves a single-cell reference.
+func (r resolver) resolveSingle(ep tsvt.Endpoint) cellset {
+	at, ok := a1Address(ep)
 	if !ok {
-		return errorValue(ErrRef)
+		return refError()
 	}
-	return value(textVal(raw))
+	return cellset{values: []Value{r.comp.read(rowIndex(at.Row), colIndex(at.Col))}, isSingle: true}
 }
 
-// resolveRowSelector resolves a whole-row reference to that row's cells.
-func (r resolver) resolveRowSelector(sel tsvt.RowSelector) cellset {
-	rowIdx, ok := r.resolveRow(sel.Row)
-	if !ok {
-		return cellset{values: []Value{errorValue(ErrRef)}}
-	}
-	values := make([]Value, r.width)
-	for col := range values {
-		values[col] = r.read(rowIdx, col)
-	}
-	return cellset{values: values}
-}
-
-// resolveMatrix resolves the rectangular hull of two cell endpoints (§5.3); a
-// non-cell endpoint or an unresolvable corner is #REF! (ADR 0003 rule 4).
+// resolveMatrix resolves the rectangular hull of two A1 corners (`A1:B3`).
 func (r resolver) resolveMatrix(from, to tsvt.Endpoint) cellset {
-	a, aok := r.corner(from)
-	b, bok := r.corner(to)
+	a, aok := a1Address(from)
+	b, bok := a1Address(to)
 	if !aok || !bok {
 		return cellset{values: []Value{errorValue(ErrRef)}}
 	}
 	return cellset{values: r.hull(a, b)}
 }
 
-// corner resolves a matrix endpoint to a concrete (row, col); ok is false for a
-// non-cell endpoint or an unresolvable column/row.
-func (r resolver) corner(ep tsvt.Endpoint) (Address, bool) {
-	cell, isCell := ep.(tsvt.CellEndpoint)
-	if !isCell {
-		return Address{}, false
-	}
-	cr := r.resolveColumn(cell.Col)
-	rowIdx, rowOK := r.resolveRow(cell.Row)
-	if !cr.isOK || !rowOK {
-		return Address{}, false
-	}
-	return Address{Row: rowIdx, Col: cr.index}, true
-}
-
 // hull reads every cell in the inclusive rectangle spanned by a and b.
 func (r resolver) hull(a, b Address) []Value {
 	r0, r1 := ordered(gridPos(a.Row), gridPos(b.Row))
 	c0, c1 := ordered(gridPos(a.Col), gridPos(b.Col))
-	values := make([]Value, 0, (r1-r0+1)*(c1-c0+1))
+	values := make([]Value, 0, int(r1-r0+1)*int(c1-c0+1))
 	for row := r0; row <= r1; row++ {
 		for col := c0; col <= c1; col++ {
-			values = append(values, r.read(row, col))
+			values = append(values, r.comp.read(rowIndex(row), colIndex(col)))
 		}
 	}
 	return values
 }
 
-// ordered returns its two arguments low-first.
-func ordered(x, y gridPos) (int, int) {
+// a1Address converts an endpoint to an absolute (row, col); ok is false for any
+// non-A1 form (a row selector, a `$`/named/numeric column, or a relative row).
+func a1Address(ep tsvt.Endpoint) (Address, boolResult) {
+	cellRef, isCell := ep.(tsvt.CellEndpoint)
+	if !isCell {
+		return Address{}, false
+	}
+	col, colOK := a1Column(cellRef.Col)
+	row, rowOK := a1Row(cellRef.Row)
+	if !colOK || !rowOK {
+		return Address{}, false
+	}
+	return Address{Row: int(row), Col: int(col)}, true
+}
+
+// a1Column resolves a column to a 0-based index; only plain/absolute letters are
+// A1 columns (a named, numeric, last, or elided column is not).
+func a1Column(col tsvt.Col) (colIndex, boolResult) {
+	letters, ok := col.(tsvt.ColLetters)
+	if !ok {
+		return 0, false
+	}
+	return colIndex(lettersToIndex(columnLetters(letters.Name))), true
+}
+
+// a1Row resolves a row to a 0-based index. A1 rows are 1-based absolute: `A1`
+// parses as RowBefore{1}, `A$1` as RowAbs{1}; relative and wildcard forms are
+// not A1.
+func a1Row(row tsvt.RowRef) (rowIndex, boolResult) {
+	switch r := row.(type) {
+	case tsvt.RowBefore:
+		return absoluteRow(rowNumber(r.N))
+	case tsvt.RowAbs:
+		return absoluteRow(rowNumber(r.N))
+	default:
+		return 0, false
+	}
+}
+
+// absoluteRow maps a 1-based row number to a 0-based index, rejecting row 0.
+func absoluteRow(n rowNumber) (rowIndex, boolResult) {
+	if n < 1 {
+		return 0, false
+	}
+	return rowIndex(n - 1), true
+}
+
+// ordered returns its two coordinates low-first.
+func ordered(x, y gridPos) (gridPos, gridPos) {
 	if x <= y {
-		return int(x), int(y)
+		return x, y
 	}
-	return int(y), int(x)
-}
-
-// resolveGrouped resolves a grouped column range with one trailing row applied
-// across it: `(C:E)1` (§5.3).
-func (r resolver) resolveGrouped(ref tsvt.GroupedRange) cellset {
-	from := r.resolveColumn(ref.FromCol)
-	to := r.resolveColumn(ref.ToCol)
-	rowIdx, rowOK := r.resolveRow(ref.Row)
-	if !from.isOK || !to.isOK || !rowOK {
-		return cellset{values: []Value{errorValue(ErrRef)}}
-	}
-	return cellset{values: r.groupedCells(from.index, to.index, rowIdx)}
-}
-
-// groupedCells reads one row across an inclusive column span.
-func (r resolver) groupedCells(fromCol, toCol, row int) []Value {
-	c0, c1 := ordered(gridPos(fromCol), gridPos(toCol))
-	values := make([]Value, 0, c1-c0+1)
-	for col := c0; col <= c1; col++ {
-		values = append(values, r.read(row, col))
-	}
-	return values
+	return y, x
 }

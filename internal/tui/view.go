@@ -11,6 +11,9 @@ import (
 // cellWidth is the fixed display width of a grid cell.
 const cellWidth = 8
 
+// cursorPos is a 0-based grid coordinate (row or column).
+type cursorPos int
+
 // displayText is a rendered fragment; displayInt a value shown in the grid.
 type (
 	displayText string
@@ -18,17 +21,17 @@ type (
 )
 
 // styles for the terminal grid, tuned for a monospace "ledger" look matching
-// the web UI: muted headers, tinted computed cells, flagged error values.
+// the web UI: muted headers, tinted formula cells, flagged error values.
 var (
 	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	headStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Align(lipgloss.Center).Width(cellWidth)
 	dataStyle     = lipgloss.NewStyle().Align(lipgloss.Right).Width(cellWidth)
-	computedStyle = lipgloss.NewStyle().Align(lipgloss.Right).Width(cellWidth).Foreground(lipgloss.Color("179"))
+	formulaStyle  = lipgloss.NewStyle().Align(lipgloss.Right).Width(cellWidth).Foreground(lipgloss.Color("179"))
 	errStyle      = lipgloss.NewStyle().Align(lipgloss.Right).Width(cellWidth).Foreground(lipgloss.Color("203"))
 	cursorStyle   = lipgloss.NewStyle().Align(lipgloss.Right).Width(cellWidth).Reverse(true)
 	statusStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).MarginTop(1)
 	dirtyStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
-	paneStyle     = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1).MarginTop(1)
+	formulaBarSty = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 )
 
 // View implements tea.Model.
@@ -36,11 +39,7 @@ func (m Model) View() string {
 	if m.isQuitting {
 		return ""
 	}
-	sections := []string{m.titleBar(), m.grid()}
-	if m.mode == modeTemplate {
-		sections = append(sections, m.templatePane())
-	}
-	sections = append(sections, m.statusBar())
+	sections := []string{m.titleBar(), m.formulaBar(), m.grid(), m.statusBar()}
 	return strings.Join(sections, "\n") + "\n"
 }
 
@@ -51,6 +50,17 @@ func (m Model) titleBar() string {
 		state = dirtyStyle.Render("● unsaved")
 	}
 	return titleStyle.Render("tsvsheet") + "  " + state
+}
+
+// formulaBar shows the selected cell's address and its source (a literal or an
+// =formula), reflecting the in-progress edit buffer while editing.
+func (m Model) formulaBar() string {
+	addr := sheet.Address{Row: m.row, Col: m.col}.String()
+	source := m.sourceAt(m.row, m.col)
+	if m.mode == modeEdit {
+		source = m.buffer + "▏"
+	}
+	return formulaBarSty.Render(addr+": ") + source
 }
 
 // grid renders the computed sheet with column letters, row numbers, and the
@@ -83,11 +93,11 @@ func (m Model) gridRow(row int) string {
 
 // renderCell styles one grid cell by its kind and cursor state.
 func (m Model) renderCell(row, col int) string {
-	value := m.computedValue(row, col)
+	value := m.computedAt(row, col)
 	return m.cellStyle(row, col, value).Render(clip(displayText(value)))
 }
 
-// cellStyle selects the style for a cell: cursor, error, computed, or data.
+// cellStyle selects the style for a cell: cursor, error, formula, or literal.
 func (m Model) cellStyle(row, col int, value string) lipgloss.Style {
 	if row == m.row && col == m.col {
 		return cursorStyle
@@ -95,27 +105,19 @@ func (m Model) cellStyle(row, col int, value string) lipgloss.Style {
 	if isErrorValue(displayText(value)) {
 		return errStyle
 	}
-	if !m.editable(row, col) {
-		return computedStyle
+	if strings.HasPrefix(m.sourceAt(row, col), "=") {
+		return formulaStyle
 	}
 	return dataStyle
 }
 
-// statusBar renders the mode hint, edit buffer, and diagnostics count.
+// statusBar renders the mode hint and diagnostics count.
 func (m Model) statusBar() string {
 	line := m.status
-	if m.mode == modeCell {
-		line = "» " + m.buffer + "▏   " + m.status
-	}
 	if n := len(m.state.Diagnostics); n > 0 {
 		line = errStyleInline(displayText(itoa(displayInt(n))+" diagnostic(s)")) + "  " + line
 	}
 	return statusStyle.Render(line)
-}
-
-// templatePane renders the template edit buffer.
-func (m Model) templatePane() string {
-	return paneStyle.Render(m.buffer + "▏")
 }
 
 // errStyleInline renders an inline error-colored fragment.
@@ -135,7 +137,7 @@ func clip(s displayText) string {
 // isErrorValue reports whether a cell value is a spreadsheet error value.
 func isErrorValue(value displayText) bool {
 	switch sheet.ErrorValue(value) {
-	case sheet.ErrRef, sheet.ErrValue, sheet.ErrName, sheet.ErrDiv:
+	case sheet.ErrRef, sheet.ErrValue, sheet.ErrName, sheet.ErrDiv, sheet.ErrCirc:
 		return true
 	default:
 		return false

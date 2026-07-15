@@ -16,15 +16,18 @@ import (
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
-var (
-	sampleData     = sheet.Grid{{"1", "2", "3", "4"}, {"2", "3", "4", "5"}, {"3", "4", "5", "6"}}
-	sampleTemplate = []byte("=body\nE=C + D\n")
+// sampleSheet is a small spreadsheet: three data columns and a D-column formula
+// summing B and C per row.
+var sampleSheet = []byte(
+	"name\tb\tc\ttotal\n" +
+		"Alice\t2\t3\t=B2+C2\n" +
+		"Bob\t4\t5\t=B3+C3\n",
 )
 
 // testServer builds a server over a fresh session and records whether save ran.
 func testServer(t *testing.T) (serve.Server, *bool) {
 	t.Helper()
-	sess, err := session.New(sampleTemplate, sampleData)
+	sess, err := session.New(sampleSheet)
 	require.NoError(t, err)
 	saved := false
 	return serve.NewServer(sess, func() error { saved = true; return nil }), &saved
@@ -48,65 +51,45 @@ func TestState(t *testing.T) {
 
 	var state session.State
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
-	assert.Equal(t, "7", state.Computed[0][4])
+	assert.Equal(t, "5", state.Computed[1][3]) // D2 = B2+C2
 	assert.False(t, state.IsDirty)
 }
 
-func TestSetTemplate_OK(t *testing.T) {
+func TestSetCell_OK(t *testing.T) {
 	t.Parallel()
 
 	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodPut, "/api/template", `{"text":"=body\nE=C * D\n"}`)
+	rec := do(t, srv, http.MethodPut, "/api/cell", `{"row":1,"col":1,"text":"10"}`)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var state session.State
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
-	assert.Equal(t, "12", state.Computed[0][4])
+	assert.Equal(t, "13", state.Computed[1][3]) // D2 = 10+3
 	assert.True(t, state.IsDirty)
 }
 
-func TestSetTemplate_SyntaxError(t *testing.T) {
+func TestSetCell_FormulaSyntaxError(t *testing.T) {
 	t.Parallel()
 
 	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodPut, "/api/template", `{"text":"=sum("}`)
+	rec := do(t, srv, http.MethodPut, "/api/cell", `{"row":1,"col":3,"text":"=sum("}`)
 	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 	assert.Contains(t, rec.Body.String(), "error")
 }
 
-func TestSetTemplate_BadBody(t *testing.T) {
+func TestSetCell_InvalidAddress(t *testing.T) {
 	t.Parallel()
 
 	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodPut, "/api/template", `not json`)
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func TestSetDataCell_OK(t *testing.T) {
-	t.Parallel()
-
-	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodPut, "/api/data/cell", `{"row":0,"col":2,"value":"10"}`)
-	require.Equal(t, http.StatusOK, rec.Code)
-
-	var state session.State
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
-	assert.Equal(t, "14", state.Computed[0][4]) // C+D = 10+4
-}
-
-func TestSetDataCell_InvalidAddress(t *testing.T) {
-	t.Parallel()
-
-	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodPut, "/api/data/cell", `{"row":-1,"col":0,"value":"x"}`)
+	rec := do(t, srv, http.MethodPut, "/api/cell", `{"row":-1,"col":0,"text":"x"}`)
 	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 }
 
-func TestSetDataCell_BadBody(t *testing.T) {
+func TestSetCell_BadBody(t *testing.T) {
 	t.Parallel()
 
 	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodPut, "/api/data/cell", `{`)
+	rec := do(t, srv, http.MethodPut, "/api/cell", `not json`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
@@ -123,7 +106,7 @@ func TestSave_OK(t *testing.T) {
 func TestSave_Error(t *testing.T) {
 	t.Parallel()
 
-	sess, err := session.New(sampleTemplate, sampleData)
+	sess, err := session.New(sampleSheet)
 	require.NoError(t, err)
 	srv := serve.NewServer(sess, func() error { return errors.New("disk full") })
 
@@ -136,13 +119,13 @@ func TestExplain_OK(t *testing.T) {
 	t.Parallel()
 
 	srv, _ := testServer(t)
-	rec := do(t, srv, http.MethodGet, "/api/explain?cell=E1", "")
+	rec := do(t, srv, http.MethodGet, "/api/explain?cell=D2", "")
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var trace sheet.Trace
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &trace))
-	assert.Equal(t, "7", trace.Value)
-	assert.Equal(t, "C + D", trace.Formula)
+	assert.Equal(t, "5", trace.Value)
+	assert.Equal(t, "B2 + C2", trace.Formula)
 }
 
 func TestExplain_BadCell(t *testing.T) {

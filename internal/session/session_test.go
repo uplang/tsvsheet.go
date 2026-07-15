@@ -12,15 +12,17 @@ import (
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
-// sample is a small worksheet: 3 data rows, a body formula in column E.
-var (
-	sampleData     = sheet.Grid{{"1", "2", "3", "4"}, {"2", "3", "4", "5"}, {"3", "4", "5", "6"}}
-	sampleTemplate = []byte("=body\nE=C + D\n")
+// sampleSheet is a small spreadsheet: three data columns and a formula in D
+// that sums B and C for each row.
+var sampleSheet = []byte(
+	"name\tb\tc\ttotal\n" +
+		"Alice\t2\t3\t=B2+C2\n" +
+		"Bob\t4\t5\t=B3+C3\n",
 )
 
 func newSession(t *testing.T) *session.Session {
 	t.Helper()
-	s, err := session.New(sampleTemplate, sampleData)
+	s, err := session.New(sampleSheet)
 	require.NoError(t, err)
 	return s
 }
@@ -29,8 +31,9 @@ func TestNew_ComputesEagerly(t *testing.T) {
 	t.Parallel()
 
 	state := newSession(t).Snapshot()
-	assert.Equal(t, "7", state.Computed[0][4]) // C+D at row 0 = 3+4
-	assert.Equal(t, "=body\nE=C + D\n", state.Template)
+	assert.Equal(t, "5", state.Computed[1][3]) // D2 = B2+C2 = 2+3
+	assert.Equal(t, "9", state.Computed[2][3]) // D3 = B3+C3 = 4+5
+	assert.Equal(t, "=B2+C2", state.Source[1][3])
 	assert.False(t, state.IsDirty)
 	assert.Empty(t, state.Diagnostics)
 }
@@ -38,86 +41,54 @@ func TestNew_ComputesEagerly(t *testing.T) {
 func TestNew_SyntaxError(t *testing.T) {
 	t.Parallel()
 
-	_, err := session.New([]byte("=sum("), sampleData)
+	_, err := session.New([]byte("1\t=sum(\n"))
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 }
 
-func TestNew_RejectedTemplate(t *testing.T) {
-	t.Parallel()
-
-	_, err := session.New([]byte("=final\n=A:C<"), sampleData)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, constants.ErrUnsupported)
-}
-
-func TestSetTemplate_RecomputesAndDirties(t *testing.T) {
+func TestSetCell_EditsLiteralAndRecomputes(t *testing.T) {
 	t.Parallel()
 
 	s := newSession(t)
-	require.NoError(t, s.SetTemplate([]byte("=body\nE=C * D\n")))
+	require.NoError(t, s.SetCell(sheet.Address{Row: 1, Col: 1}, "10")) // B2 = 10
 	state := s.Snapshot()
-	assert.Equal(t, "12", state.Computed[0][4]) // C*D at row 0 = 3*4
+	assert.Equal(t, "10", state.Source[1][1])
+	assert.Equal(t, "13", state.Computed[1][3]) // D2 = 10+3
 	assert.True(t, state.IsDirty)
 }
 
-func TestSetTemplate_AtomicOnSyntaxError(t *testing.T) {
+func TestSetCell_EditsFormula(t *testing.T) {
+	t.Parallel()
+
+	s := newSession(t)
+	require.NoError(t, s.SetCell(sheet.Address{Row: 1, Col: 3}, "=B2*C2")) // D2 = 2*3
+	assert.Equal(t, "6", s.Snapshot().Computed[1][3])
+}
+
+func TestSetCell_AtomicOnSyntaxError(t *testing.T) {
 	t.Parallel()
 
 	s := newSession(t)
 	before := s.Snapshot()
 
-	err := s.SetTemplate([]byte("=sum("))
+	err := s.SetCell(sheet.Address{Row: 1, Col: 3}, "=sum(")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 
 	after := s.Snapshot()
 	assert.Equal(t, before.Computed, after.Computed)
-	assert.Equal(t, before.Template, after.Template)
-	assert.False(t, after.IsDirty) // unchanged: still clean
+	assert.Equal(t, before.Source, after.Source)
+	assert.False(t, after.IsDirty) // rejected before any mutation
 }
 
-func TestSetTemplate_AtomicOnRejectedTemplate(t *testing.T) {
+func TestSetCell_GrowsGridOnAppend(t *testing.T) {
 	t.Parallel()
 
 	s := newSession(t)
-	before := s.Snapshot()
-
-	err := s.SetTemplate([]byte("=final\n=A:C<"))
-	require.Error(t, err)
-	assert.ErrorIs(t, err, constants.ErrUnsupported)
-	assert.Equal(t, before.Template, s.Snapshot().Template)
-}
-
-func TestSetDataCell_EditsAndRecomputes(t *testing.T) {
-	t.Parallel()
-
-	s := newSession(t)
-	require.NoError(t, s.SetDataCell(sheet.Address{Row: 0, Col: 2}, "10")) // C row 0 = 10
+	require.NoError(t, s.SetCell(sheet.Address{Row: 3, Col: 0}, "Carol")) // one past last row
 	state := s.Snapshot()
-	assert.Equal(t, "10", state.Data[0][2])
-	assert.Equal(t, "14", state.Computed[0][4]) // C+D = 10+4
-	assert.True(t, state.IsDirty)
-}
-
-func TestSetDataCell_RejectsNegativeAddress(t *testing.T) {
-	t.Parallel()
-
-	s := newSession(t)
-	err := s.SetDataCell(sheet.Address{Row: -1, Col: 0}, "x")
-	require.Error(t, err)
-	assert.ErrorIs(t, err, constants.ErrInvalidValue)
-	assert.False(t, s.Snapshot().IsDirty) // rejected before any mutation
-}
-
-func TestSetDataCell_GrowsGridOnAppend(t *testing.T) {
-	t.Parallel()
-
-	s := newSession(t)
-	require.NoError(t, s.SetDataCell(sheet.Address{Row: 3, Col: 0}, "new")) // one past last row
-	state := s.Snapshot()
-	require.Len(t, state.Data, 4)
-	assert.Equal(t, "new", state.Data[3][0])
+	require.Len(t, state.Source, 4)
+	assert.Equal(t, "Carol", state.Source[3][0])
 }
 
 func TestDirtyLifecycle(t *testing.T) {
@@ -126,23 +97,17 @@ func TestDirtyLifecycle(t *testing.T) {
 	s := newSession(t)
 	assert.False(t, s.Snapshot().IsDirty)
 
-	require.NoError(t, s.SetDataCell(sheet.Address{Row: 0, Col: 0}, "9"))
+	require.NoError(t, s.SetCell(sheet.Address{Row: 0, Col: 0}, "9"))
 	assert.True(t, s.Snapshot().IsDirty)
 
 	s.MarkSaved()
 	assert.False(t, s.Snapshot().IsDirty)
 }
 
-func TestTemplateText(t *testing.T) {
+func TestSource_EncodesTSV(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, sampleTemplate, newSession(t).TemplateText())
-}
-
-func TestDataTSV(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "1\t2\t3\t4\n2\t3\t4\t5\n3\t4\t5\t6\n", string(newSession(t).DataTSV()))
+	assert.Equal(t, string(sampleSheet), string(newSession(t).Source()))
 }
 
 func TestSnapshot_IsIsolatedCopy(t *testing.T) {
@@ -150,17 +115,17 @@ func TestSnapshot_IsIsolatedCopy(t *testing.T) {
 
 	s := newSession(t)
 	state := s.Snapshot()
-	state.Computed[0][0] = "mutated"                  // mutate the snapshot
-	assert.Equal(t, "1", s.Snapshot().Computed[0][0]) // session unaffected
+	state.Computed[0][0] = "mutated"                     // mutate the snapshot
+	assert.Equal(t, "name", s.Snapshot().Computed[0][0]) // session unaffected
 }
 
 func TestExplain(t *testing.T) {
 	t.Parallel()
 
-	trace, err := newSession(t).Explain(sheet.Address{Row: 0, Col: 4}) // E1 = C+D
+	trace, err := newSession(t).Explain(sheet.Address{Row: 1, Col: 3}) // D2 = B2+C2
 	require.NoError(t, err)
-	assert.Equal(t, "7", trace.Value)
-	assert.Equal(t, "C + D", trace.Formula)
+	assert.Equal(t, "5", trace.Value)
+	assert.Equal(t, "B2 + C2", trace.Formula)
 }
 
 func TestExplain_OutOfGrid(t *testing.T) {
@@ -178,13 +143,13 @@ func TestConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
-		go func(_ int) {
+		go func() {
 			defer wg.Done()
-			_ = s.SetDataCell(sheet.Address{Row: 0, Col: 0}, "x")
+			_ = s.SetCell(sheet.Address{Row: 0, Col: 0}, "x")
 			_ = s.Snapshot()
-			_ = s.TemplateText()
+			_ = s.Source()
 			s.MarkSaved()
-		}(i)
+		}()
 	}
 	wg.Wait()
 }

@@ -1,7 +1,8 @@
-// Package cli is the tsvsheet command tier: it wires the engine
-// (internal/tsvt, internal/sheet) to urfave/cli commands with strict unix
-// stdin/stdout discipline. Command logic lives in stream-injected functions so
-// it is fully testable; the cli.Command wrappers only bind flags and streams.
+// Package cli is the tsvsheet command tier: it wires the engine (internal/tsvt,
+// internal/sheet) to urfave/cli commands with strict unix stdin/stdout
+// discipline. A .tsvt file IS the spreadsheet; every command takes it as a
+// positional argument. Command logic lives in stream-injected functions so it
+// is fully testable; the cli.Command wrappers only bind flags and streams.
 package cli
 
 import (
@@ -9,6 +10,7 @@ import (
 	"os"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
 // Streams are a command's injected I/O: input, output, and diagnostics. Real
@@ -19,7 +21,7 @@ type Streams struct {
 	Err io.Writer
 }
 
-// sourcePath is a --template or --data flag value. Empty or "-" means stdin.
+// sourcePath is a positional spreadsheet path. Empty or "-" means stdin.
 type sourcePath string
 
 // stdinMarker is the conventional stdin path.
@@ -46,36 +48,6 @@ func (p sourcePath) open(stdin io.Reader) (io.Reader, closeFunc, error) {
 // noClose is the release for a source that must not be closed (stdin).
 func noClose() error { return nil }
 
-// templateAndData opens both the template and the data sources, rejecting the
-// impossible case of reading both from a single stdin stream.
-func templateAndData(tmpl, data sourcePath, stdin io.Reader) (io.Reader, io.Reader, closeFunc, error) {
-	if tmpl.isStdin() && data.isStdin() {
-		const msg = "cannot read both template and data from stdin; give a path for one"
-		return nil, nil, nil, constants.ErrInvalidValue.With(nil, "message", msg)
-	}
-	tmplReader, closeTmpl, err := tmpl.open(stdin)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	dataReader, closeData, err := data.open(stdin)
-	if err != nil {
-		_ = closeTmpl()
-		return nil, nil, nil, err
-	}
-	return tmplReader, dataReader, chain(closeTmpl, closeData), nil
-}
-
-// chain composes two release functions into one, releasing both. Callers defer
-// and discard the result (these are read-only file closes after a full read),
-// so a close error is benign and not surfaced.
-func chain(first, second closeFunc) closeFunc {
-	return func() error {
-		_ = first()
-		_ = second()
-		return nil
-	}
-}
-
 // readAll reads a source fully into a byte slice, wrapping failures.
 func readAll(r io.Reader) ([]byte, error) {
 	data, err := io.ReadAll(r)
@@ -83,4 +55,13 @@ func readAll(r io.Reader) ([]byte, error) {
 		return nil, constants.ErrReadInput.With(err)
 	}
 	return data, nil
+}
+
+// parseSheet reads a spreadsheet source fully and parses it.
+func parseSheet(r io.Reader) (sheet.Sheet, error) {
+	src, err := readAll(r)
+	if err != nil {
+		return sheet.Sheet{}, err
+	}
+	return sheet.Parse(src)
 }

@@ -1,204 +1,170 @@
 package sheet_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/uplang/tsvsheet.go/internal/constants"
 	"github.com/uplang/tsvsheet.go/internal/sheet"
-	"github.com/uplang/tsvsheet.go/internal/tsvt"
 )
 
-// evalData computes `Z=<formula>` against custom data and returns row 0's Z.
-func evalData(t *testing.T, formula, data string) string {
-	t.Helper()
-	out := computeGrid(t, "=body\nZ="+formula, data)
-	return out[0][25]
-}
-
-func TestValue_EmptyCell(t *testing.T) {
+func TestCompute_StringComparison(t *testing.T) {
 	t.Parallel()
 
-	// Column B is empty in the data.
-	const data = "1\t\t3\n"
-	assert.Equal(t, "", evalData(t, "B", data))       // empty renders empty
-	assert.Equal(t, "1", evalData(t, "1 + B", data))  // empty is 0 in arithmetic
-	assert.Equal(t, "0", evalData(t, "sum(B)", data)) // sum of only-empty is 0
+	// A1="apple", B1="banana" (text literals); the formula compares them.
+	cases := map[string]string{
+		"=if(A1 < B1, 1, 0)":  "1",
+		"=if(B1 < A1, 1, 0)":  "0",
+		"=if(A1 = A1, 1, 0)":  "1",
+		"=if(A1 <> B1, 1, 0)": "1",
+		"=if(B1 > A1, 1, 0)":  "1",
+		"=if(A1 <= A1, 1, 0)": "1",
+		"=if(A1 >= A1, 1, 0)": "1",
+	}
+	for expr, want := range cases {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			g := compute(t, "apple\tbanana\t"+expr+"\n")
+			assert.Equal(t, want, cellAt(t, g, 0, 2))
+		})
+	}
 }
 
-func TestValue_EmptyExcludedFromCount(t *testing.T) {
+func TestCompute_MixedComparisonAndArithmetic(t *testing.T) {
 	t.Parallel()
 
-	const data = "1\t\t3\n"
-	// count(A:C) counts A and C (B empty excluded) = 2.
-	assert.Equal(t, "2", evalData(t, "count(A:C)", data))
+	// Comparing/adding a text cell to a number is #VALUE!.
+	g := compute(t, "apple\t=A1 < 5\t=1 + A1\t=if(A1, 1, 0)\n")
+	assert.Equal(t, string(sheet.ErrValue), cellAt(t, g, 0, 1)) // string < number
+	assert.Equal(t, string(sheet.ErrValue), cellAt(t, g, 0, 2)) // 1 + string
+	assert.Equal(t, "1", cellAt(t, g, 0, 3))                    // non-empty string is truthy
 }
 
-func TestValue_ErrorCellPropagates(t *testing.T) {
+func TestCompute_EmptyCells(t *testing.T) {
 	t.Parallel()
 
-	// A data cell holding an error value round-trips and propagates.
-	const data = "#REF!\t2\n"
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "A", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "A + B", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "sum(A:B)", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "count(A:B)", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "concat(A, B)", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "len(A)", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "abs(A)", data))
-	assert.Equal(t, string(sheet.ErrRef), evalData(t, "round(A)", data))
+	// A1 is empty.
+	g := compute(t, "\t=A1\t=1 + A1\t=sum(A1:A1)\t=if(A1, 1, 0)\n")
+	assert.Equal(t, "", cellAt(t, g, 0, 1))  // empty renders empty
+	assert.Equal(t, "1", cellAt(t, g, 0, 2)) // empty is 0 in arithmetic
+	assert.Equal(t, "0", cellAt(t, g, 0, 3)) // empty excluded from sum
+	assert.Equal(t, "0", cellAt(t, g, 0, 4)) // empty is falsy
 }
 
-func TestValue_StringComparison(t *testing.T) {
+func TestCompute_EmptyAggregates(t *testing.T) {
 	t.Parallel()
 
-	// Unbound named columns are string literals (rule 16); compare them.
-	assert.Equal(t, "1", eval1(t, `if("apple" < "banana", 1, 0)`))
-	assert.Equal(t, "0", eval1(t, `if("banana" < "apple", 1, 0)`))
-	assert.Equal(t, "1", eval1(t, `if("apple" = "apple", 1, 0)`))
-	assert.Equal(t, "1", eval1(t, `if("apple" <> "banana", 1, 0)`))
-	assert.Equal(t, "1", eval1(t, `if("banana" > "apple", 1, 0)`))
-	assert.Equal(t, "1", eval1(t, `if("apple" <= "apple", 1, 0)`))
-	assert.Equal(t, "1", eval1(t, `if("apple" >= "apple", 1, 0)`))
+	g := compute(t, "\t\t=min(A1:B1)\t=max(A1:B1)\t=avg(A1:B1)\n") // A1,B1 empty
+	assert.Equal(t, string(sheet.ErrValue), cellAt(t, g, 0, 2))    // min of nothing
+	assert.Equal(t, string(sheet.ErrValue), cellAt(t, g, 0, 3))    // max of nothing
+	assert.Equal(t, string(sheet.ErrDiv), cellAt(t, g, 0, 4))      // avg of nothing
 }
 
-func TestValue_MixedComparisonIsValueError(t *testing.T) {
+func TestCompute_Arity(t *testing.T) {
 	t.Parallel()
 
-	// Comparing a number to a string is #VALUE! (rule 12).
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, `C < "apple"`))
+	cases := map[string]string{
+		"abs(A1, C1)":       string(sheet.ErrValue),
+		"len(A1, C1)":       string(sheet.ErrValue),
+		"round()":           string(sheet.ErrValue),
+		"round(A1, C1, D1)": string(sheet.ErrValue),
+		"if(A1)":            string(sheet.ErrValue),
+		"bogus(A1)":         string(sheet.ErrName),
+		"round(A1, Z99)":    string(sheet.ErrRef), // error place argument
+	}
+	for expr, want := range cases {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, want, formula1(t, expr))
+		})
+	}
 }
 
-func TestValue_StringTruthy(t *testing.T) {
+func TestCompute_A1Forms(t *testing.T) {
 	t.Parallel()
 
-	// A non-empty string is truthy; an empty string is falsy (rule 9).
-	assert.Equal(t, "1", eval1(t, `if("x", 1, 0)`))
-	assert.Equal(t, "0", evalData(t, `if(B, 1, 0)`, "1\t\t3\n")) // B empty → falsy
+	// A1=2, C1=3, D1=4 (B1 holds the formula).
+	assert.Equal(t, "2", formula1(t, "$A$1")) // absolute-marked
+	assert.Equal(t, "2", formula1(t, "A$1"))  // row-absolute form
+	assert.Equal(t, "2", formula1(t, "A1"))   // plain
 }
 
-func TestValue_NonNumericArithmeticIsValueError(t *testing.T) {
+func TestCompute_NonA1References(t *testing.T) {
 	t.Parallel()
 
-	// Arithmetic on a string operand is #VALUE!.
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, `1 + "apple"`))
+	// Every non-A1 reference form is #REF! in the spreadsheet model.
+	for _, expr := range []string{"A0", `"x"`, "[0]", "$", "A+1", "A$", "sum((A:C)1)"} {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, string(sheet.ErrRef), formula1(t, expr))
+		})
+	}
 }
 
-func TestBuiltins_EmptyAggregates(t *testing.T) {
+func TestCompute_RangeInScalarContext(t *testing.T) {
 	t.Parallel()
 
-	const data = "1\t\t3\n"
-	// min/max over an only-empty range have no numeric values → #VALUE!.
-	assert.Equal(t, string(sheet.ErrValue), evalData(t, "min(B)", data))
-	assert.Equal(t, string(sheet.ErrValue), evalData(t, "max(B)", data))
-	// avg over an only-empty range → #DIV/0!.
-	assert.Equal(t, string(sheet.ErrDiv), evalData(t, "avg(B)", data))
+	// A range where a single value is required is #VALUE!.
+	assert.Equal(t, string(sheet.ErrValue), formula1(t, "A2:C2 + 1"))
 }
 
-func TestBuiltins_Arity(t *testing.T) {
+func TestCompute_MatrixWithNonA1Endpoint(t *testing.T) {
 	t.Parallel()
 
-	// Wrong-arity builtins are #VALUE!.
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, "abs(C, D)"))
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, "len(C, D)"))
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, "round()"))
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, "round(C, D, A)"))
-	assert.Equal(t, string(sheet.ErrValue), eval1(t, "if(C)"))
+	// A matrix whose endpoint is not an A1 cell is #REF!.
+	assert.Equal(t, string(sheet.ErrRef), formula1(t, "sum(A2:$)"))
 }
 
-func TestBuiltins_RoundErrorPlaces(t *testing.T) {
+func TestCompute_BuiltinsPropagateErrors(t *testing.T) {
 	t.Parallel()
 
-	// A #REF! place argument propagates.
-	assert.Equal(t, string(sheet.ErrRef), evalAt(t, "round(C, C2)", 1)) // C2 → #REF!
+	// Z98:Z99 (and Z99) are out of grid, so each builtin propagates #REF!.
+	for _, expr := range []string{
+		"min(Z98:Z99)", "max(Z98:Z99)", "count(Z98:Z99)", "avg(Z98:Z99)",
+		"abs(Z99)", "round(Z99)", "concat(A1, Z99)", "len(Z99)",
+	} {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, string(sheet.ErrRef), formula1(t, expr))
+		})
+	}
 }
 
-func TestCheck_UnknownFunctionAdvisory(t *testing.T) {
+func TestCompute_StringLeftArithmetic(t *testing.T) {
 	t.Parallel()
 
-	tmpl, err := tsvt.Parse(tsvt.Source("=body\nZ=bogus(C)\nY=sum(A)"))
-	require.NoError(t, err)
-	diags := sheet.Check(tmpl)
-	require.Len(t, diags, 1)
-	assert.False(t, diags[0].IsFatal)
-	assert.Contains(t, diags[0].Message, "bogus")
+	// A text cell on the left of arithmetic is #VALUE!.
+	g := compute(t, "apple\t=A1 + 1\n")
+	assert.Equal(t, string(sheet.ErrValue), cellAt(t, g, 0, 1))
 }
 
-func TestCheck_UnknownFunctionInPayload(t *testing.T) {
+func TestCompute_EmptyComparedToText(t *testing.T) {
 	t.Parallel()
 
-	tmpl, err := tsvt.Parse(tsvt.Source("=final\nZ$=bogus(A)"))
-	require.NoError(t, err)
-	diags := sheet.Check(tmpl)
-	require.Len(t, diags, 1)
-	assert.Contains(t, diags[0].Message, "bogus")
+	// Comparing an empty cell to a text cell exercises the empty-text path.
+	g := compute(t, "\tx\t=if(A1 = B1, 1, 0)\n") // A1 empty, B1="x"
+	assert.Equal(t, "0", cellAt(t, g, 0, 2))
 }
 
-func TestCheck_PerCellModifierFatal(t *testing.T) {
+func TestCompute_ReversedRange(t *testing.T) {
 	t.Parallel()
 
-	// A per-cell structural modifier is rejected (rule 18).
-	tmpl, err := tsvt.Parse(tsvt.Source("=body\nC!"))
-	require.NoError(t, err)
-	diags := sheet.Check(tmpl)
-	require.Len(t, diags, 1)
-	assert.True(t, diags[0].IsFatal)
+	// A range written high-to-low spans the same hull (ordered corners).
+	g := compute(t, "1\t2\t3\t=sum(C1:A1)\n") // C1:A1 == A1:C1
+	assert.Equal(t, "6", cellAt(t, g, 0, 3))
 }
 
-func TestCheck_StructuralWithRowFatal(t *testing.T) {
+func TestParse_ReadError(t *testing.T) {
 	t.Parallel()
 
-	// A structural command with a row (per-cell scope) is rejected.
-	tmpl, err := tsvt.Parse(tsvt.Source("=final\n=C1<"))
-	require.NoError(t, err)
-	diags := sheet.Check(tmpl)
-	require.Len(t, diags, 1)
-	assert.True(t, diags[0].IsFatal)
-}
-
-func TestCheck_CleanTemplate(t *testing.T) {
-	t.Parallel()
-
-	tmpl, err := tsvt.Parse(tsvt.Source("=body\nZ=C + D"))
-	require.NoError(t, err)
-	assert.Empty(t, sheet.Check(tmpl))
-}
-
-func TestCompute_NoData(t *testing.T) {
-	t.Parallel()
-
-	// A final aggregate over an empty grid: no rows, references are #REF!.
-	tmpl, err := tsvt.Parse(tsvt.Source("=body\nZ=C"))
-	require.NoError(t, err)
-	out, err := sheet.Compute(tmpl, sheet.Grid{})
-	require.NoError(t, err)
-	assert.Empty(t, out)
-}
-
-func TestCompute_NamedFromRangeNonNamed(t *testing.T) {
-	t.Parallel()
-
-	// A header cell that is a reference but not a named column (a letter ref)
-	// binds no name; the formula referencing it by letter still works.
-	out := computeGrid(t, "=header(1)\nA\tB\tC$1\tD\n=body\nZ=A", fixedData)
-	assert.Equal(t, "1", out[0][25])
-}
-
-func TestCompute_MatrixFromMixed(t *testing.T) {
-	t.Parallel()
-
-	// A reversed matrix (endpoints out of order) still spans the hull.
-	assert.Equal(t, "15", eval1(t, "sum(B$3:A$1)")) // same 6 cells as A$1:B$3
-}
-
-func TestReadTSV_LongLine(t *testing.T) {
-	t.Parallel()
-
-	// A line at the buffer boundary still reads.
-	long := strings.Repeat("x", 1000)
-	g, err := sheet.ReadTSV(strings.NewReader(long + "\n"))
-	require.NoError(t, err)
-	assert.Equal(t, sheet.Grid{{long}}, g)
+	// A single line exceeding the scanner's 1 MiB bound surfaces a read error.
+	huge := make([]byte, 2<<20)
+	for i := range huge {
+		huge[i] = 'x'
+	}
+	_, err := sheet.Parse(huge)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
