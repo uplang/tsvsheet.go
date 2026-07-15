@@ -24,7 +24,7 @@ const filePerm = 0o600
 // until ctx is cancelled (Ctrl-C). The sheet must be a file — serve saves edits
 // back to it, so stdin is not a valid source.
 func runServe(ctx context.Context, cfg serveConfig) error {
-	server, err := loadServer(cfg.source, cfg.isUnconfined)
+	server, err := loadServer(cfg)
 	if err != nil {
 		return err
 	}
@@ -33,14 +33,31 @@ func runServe(ctx context.Context, cfg serveConfig) error {
 	return http.Serve(ctx, shutdownTimeout)
 }
 
+// defaultRefresh is the auto-refresh interval applied when a sheet has volatile
+// functions and no interval was named on the command line.
+const defaultRefresh = time.Second
+
 // loadServer reads the spreadsheet file into a session and builds the HTTP
-// server with a saver that writes edits back to that file.
-func loadServer(source sourcePath, isUnconfined pathAccess) (serve.Server, error) {
-	sess, persist, err := loadEditable(source, isUnconfined)
+// server with a saver and the effective auto-refresh interval.
+func loadServer(cfg serveConfig) (serve.Server, error) {
+	sess, persist, err := loadEditable(cfg.source, cfg.isUnconfined)
 	if err != nil {
 		return serve.Server{}, err
 	}
-	return serve.NewServer(sess, persist), nil
+	return serve.NewServer(sess, persist, effectiveRefresh(cfg, sess)), nil
+}
+
+// effectiveRefresh is the explicit --refresh-interval when set, else a default
+// when the sheet has clock-dependent functions (TODAY/NOW/ISNOW), else off.
+func effectiveRefresh(cfg serveConfig, sess *session.Session) time.Duration {
+	switch {
+	case cfg.isRefreshSet:
+		return cfg.refresh
+	case sess.IsVolatile():
+		return defaultRefresh
+	default:
+		return 0
+	}
 }
 
 // saver builds the persist function: it writes the session's current source

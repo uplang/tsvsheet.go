@@ -114,12 +114,35 @@ func (s *Session) DeleteCol(at sheet.Address) {
 func (s *Session) Snapshot() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.state()
+}
+
+// state builds the read model; the caller holds s.mu.
+func (s *Session) state() State {
 	return State{
 		Computed:    grid(s.computed),
 		Source:      grid(s.sheet.Source()),
 		Diagnostics: append([]sheet.Diagnostic(nil), s.diagnostics...),
 		IsDirty:     s.isDirty,
 	}
+}
+
+// IsVolatile reports whether the sheet contains clock-dependent functions
+// (TODAY/NOW/ISNOW), so a frontend can enable periodic recomputation.
+func (s *Session) IsVolatile() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sheet.IsVolatile()
+}
+
+// Recompute re-evaluates the sheet against the current clock without changing
+// its source and returns the refreshed read model — for periodic refresh of
+// volatile functions. It does not affect the dirty flag.
+func (s *Session) Recompute() State {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recompute()
+	return s.state()
 }
 
 // Explain traces how the cell at addr was produced over the current sheet.

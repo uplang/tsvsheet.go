@@ -6,11 +6,12 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/gomatic/go-error v0.2.2
+	github.com/gomatic/go-error v0.3.0
 	github.com/gomatic/go-httpserver v0.2.0
 	github.com/gomatic/go-log v0.2.0
 	github.com/stretchr/testify v1.11.1
-	github.com/urfave/cli/v3 v3.10.0
+	github.com/uplang/isnow.go v0.6.0
+	github.com/urfave/cli/v3 v3.10.1
 )
 
 require (

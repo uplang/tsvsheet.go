@@ -4,12 +4,29 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/session"
 )
+
+func TestEffectiveRefresh(t *testing.T) {
+	t.Parallel()
+
+	plain, err := session.New([]byte(sampleSheet)) // no clock functions
+	require.NoError(t, err)
+	volatile, err := session.New([]byte("=now()\n"))
+	require.NoError(t, err)
+
+	// An explicit interval always wins.
+	assert.Equal(t, 5*time.Second, effectiveRefresh(serveConfig{refresh: 5 * time.Second, isRefreshSet: true}, plain))
+	// Unset + volatile sheet → the default; unset + plain sheet → off.
+	assert.Equal(t, defaultRefresh, effectiveRefresh(serveConfig{}, volatile))
+	assert.Equal(t, time.Duration(0), effectiveRefresh(serveConfig{}, plain))
+}
 
 // sheetFile writes the sample spreadsheet to a temp file and returns its path.
 func sheetFile(t *testing.T) sourcePath {
@@ -20,7 +37,7 @@ func sheetFile(t *testing.T) sourcePath {
 func TestLoadServer_OK(t *testing.T) {
 	t.Parallel()
 
-	srv, err := loadServer(sheetFile(t), false)
+	srv, err := loadServer(serveConfig{source: sheetFile(t)})
 	require.NoError(t, err)
 	assert.NotNil(t, srv)
 }
@@ -28,7 +45,7 @@ func TestLoadServer_OK(t *testing.T) {
 func TestLoadServer_RequiresFile(t *testing.T) {
 	t.Parallel()
 
-	_, err := loadServer("-", false)
+	_, err := loadServer(serveConfig{source: "-"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }
@@ -36,7 +53,7 @@ func TestLoadServer_RequiresFile(t *testing.T) {
 func TestLoadServer_FileMissing(t *testing.T) {
 	t.Parallel()
 
-	_, err := loadServer("/no/such.tsvt", false)
+	_, err := loadServer(serveConfig{source: "/no/such.tsvt"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrOpenFile)
 }
@@ -45,7 +62,7 @@ func TestLoadServer_SyntaxError(t *testing.T) {
 	t.Parallel()
 
 	path := writeTemp(t, "bad.tsvt", "1\t=sum(\n")
-	_, err := loadServer(sourcePath(path), false)
+	_, err := loadServer(serveConfig{source: sourcePath(path)})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 }

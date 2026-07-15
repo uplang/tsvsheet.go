@@ -386,6 +386,17 @@
   });
 
   api("GET", "/api/state").then(render).catch(reportError);
+
+  // Auto-refresh: when the sheet has clock functions (TODAY/NOW/ISNOW), the
+  // server reports a refresh cadence; recompute on that interval so volatile
+  // cells stay live. A local edit in progress is left alone.
+  api("GET", "/api/config").then((cfg) => {
+    if (!cfg.refresh_millis) return;
+    setInterval(async () => {
+      if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+      try { render(await api("POST", "/api/recompute")); } catch (err) { reportError(err); }
+    }, cfg.refresh_millis);
+  }).catch(() => {});
 })();
 </script>
 </body>

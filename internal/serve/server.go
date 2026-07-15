@@ -7,6 +7,7 @@ package serve
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
 	"github.com/uplang/tsvsheet.go/internal/session"
@@ -21,11 +22,13 @@ type Saver func() error
 type Server struct {
 	session *session.Session
 	save    Saver
+	refresh time.Duration
 }
 
-// NewServer builds a server over a session and a save function.
-func NewServer(s *session.Session, save Saver) Server {
-	return Server{session: s, save: save}
+// NewServer builds a server over a session, a save function, and an auto-refresh
+// interval (0 disables periodic recomputation of volatile cells).
+func NewServer(s *session.Session, save Saver, refresh time.Duration) Server {
+	return Server{session: s, save: save, refresh: refresh}
 }
 
 // Handler returns the HTTP handler: the JSON API under /api/ and the embedded
@@ -33,14 +36,33 @@ func NewServer(s *session.Session, save Saver) Server {
 func (srv Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", srv.handleState)
+	mux.HandleFunc("GET /api/config", srv.handleConfig)
 	mux.HandleFunc("PUT /api/cell", srv.handleCell)
 	mux.HandleFunc("POST /api/save", srv.handleSave)
+	mux.HandleFunc("POST /api/recompute", srv.handleRecompute)
 	mux.HandleFunc("GET /api/explain", srv.handleExplain)
 	mux.HandleFunc("GET /api/references", srv.handleReferences)
 	mux.HandleFunc("POST /api/structure", srv.handleStructure)
 	mux.HandleFunc("GET /api/embedded", srv.handleEmbedded)
 	mux.Handle("GET /", uiHandler())
 	return mux
+}
+
+// configResponse is the GET /api/config body: the auto-refresh interval in
+// milliseconds (0 = no periodic refresh).
+type configResponse struct {
+	RefreshMillis int `json:"refresh_millis"`
+}
+
+// handleConfig returns the UI's static configuration (the refresh interval).
+func (srv Server) handleConfig(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, configResponse{RefreshMillis: int(srv.refresh.Milliseconds())})
+}
+
+// handleRecompute re-evaluates the sheet against the current clock (refreshing
+// volatile cells) and returns the new state.
+func (srv Server) handleRecompute(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, srv.session.Recompute())
 }
 
 // handleState returns the current spreadsheet read model.

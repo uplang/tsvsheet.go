@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func testServer(t *testing.T) (serve.Server, *bool) {
 	sess, err := session.New(sampleSheet)
 	require.NoError(t, err)
 	saved := false
-	return serve.NewServer(sess, func() error { saved = true; return nil }), &saved
+	return serve.NewServer(sess, func() error { saved = true; return nil }, 0), &saved
 }
 
 // do issues a request against a server's handler and returns the recorder.
@@ -109,7 +110,7 @@ func TestSave_Error(t *testing.T) {
 
 	sess, err := session.New(sampleSheet)
 	require.NoError(t, err)
-	srv := serve.NewServer(sess, func() error { return errors.New("disk full") })
+	srv := serve.NewServer(sess, func() error { return errors.New("disk full") }, 0)
 
 	rec := do(t, srv, http.MethodPost, "/api/save", "")
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
@@ -227,7 +228,7 @@ func TestEmbedded_OK(t *testing.T) {
 	}
 	sess, err := session.NewEmbeddable([]byte("=sheet(\"c\")\n"), loader, "root")
 	require.NoError(t, err)
-	srv := serve.NewServer(sess, func() error { return nil })
+	srv := serve.NewServer(sess, func() error { return nil }, 0)
 
 	rec := do(t, srv, http.MethodGet, "/api/embedded?cell=A1", "")
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -256,6 +257,30 @@ func TestEmbedded_BadCell(t *testing.T) {
 	srv, _ := testServer(t)
 	rec := do(t, srv, http.MethodGet, "/api/embedded?cell=bogus", "")
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestConfig_RefreshMillis(t *testing.T) {
+	t.Parallel()
+
+	sess, err := session.New([]byte("=now()\n"))
+	require.NoError(t, err)
+	srv := serve.NewServer(sess, func() error { return nil }, 2*time.Second)
+
+	rec := do(t, srv, http.MethodGet, "/api/config", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"refresh_millis":2000`)
+}
+
+func TestRecompute_ReturnsFreshState(t *testing.T) {
+	t.Parallel()
+
+	srv, _ := testServer(t)
+	rec := do(t, srv, http.MethodPost, "/api/recompute", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var state session.State
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
+	assert.Equal(t, "5", state.Computed[1][3]) // D2 recomputed
 }
 
 func TestUI_ServesHTML(t *testing.T) {

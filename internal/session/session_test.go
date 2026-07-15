@@ -73,6 +73,21 @@ func TestEmbedded_ReturnsSubSheetOrNotOK(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestIsVolatileAndRecompute(t *testing.T) {
+	t.Parallel()
+
+	// sampleSheet has no clock functions.
+	assert.False(t, newSession(t).IsVolatile())
+	v, err := session.New([]byte("=now()\n"))
+	require.NoError(t, err)
+	assert.True(t, v.IsVolatile())
+
+	// Recompute refreshes the read model without dirtying it.
+	state := newSession(t).Recompute()
+	assert.Equal(t, "5", state.Computed[1][3])
+	assert.False(t, state.IsDirty)
+}
+
 func TestInsertRow_GrowsAndDirties(t *testing.T) {
 	t.Parallel()
 

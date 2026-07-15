@@ -4,6 +4,8 @@ import (
 	"math"
 	"strings"
 
+	isnow "github.com/uplang/isnow.go"
+
 	"github.com/uplang/tsvsheet.go/internal/tsvt"
 )
 
@@ -123,15 +125,42 @@ func (r resolver) evalLazy(name funcName, args []tsvt.Expr) (Value, boolResult) 
 // evalClock dispatches the volatile clock builtins TODAY and NOW, which read the
 // pass clock; ok is false for any other name. A non-empty argument list is
 // #VALUE!.
+// Clock-dependent (volatile) function names: their value changes with time.
+const (
+	fnToday = "today"
+	fnNow   = "now"
+	fnIsnow = "isnow"
+)
+
 func (r resolver) evalClock(name funcName, args []tsvt.Expr) (Value, boolResult) {
 	switch name {
-	case "today":
+	case fnToday:
 		return clockResult(argCount(len(args)), dateValue(daySerial(r.comp.now))), true
-	case "now":
+	case fnNow:
 		return clockResult(argCount(len(args)), dateValue(datetimeSerial(r.comp.now))), true
+	case fnIsnow:
+		return r.evalIsnow(args), true
 	default:
 		return Value{}, false
 	}
+}
+
+// evalIsnow tests whether an isnow date/time pattern (uplang/isnow) holds at the
+// compute clock: ISNOW("M-F noon") is TRUE when the pattern matches the current
+// pass instant. A malformed pattern, or the wrong arity, is #VALUE!.
+func (r resolver) evalIsnow(args []tsvt.Expr) Value {
+	if len(args) != 1 {
+		return errorValue(ErrValue)
+	}
+	pattern := r.eval(args[0])
+	if pattern.isError() {
+		return pattern
+	}
+	holds, err := isnow.Is(pattern.String(), r.comp.now)
+	if err != nil {
+		return errorValue(ErrValue)
+	}
+	return boolValue(boolResult(holds))
 }
 
 // clockResult returns v for a no-argument call, else #VALUE!.
