@@ -101,12 +101,19 @@ func buildCall(ctx grammar.IFunctionCallContext) (Expr, error) {
 	return Call{Name: callName(ctx), Args: args}, nil
 }
 
-// callName is the function's case-preserved name (a NAME or an all-caps COL).
+// callName is the function's case-preserved name: a NAME or an all-caps COL,
+// plus any trailing digit group folded back in (`atan2`, `log10`).
 func callName(ctx grammar.IFunctionCallContext) string {
-	if name := ctx.NAME(); name != nil {
-		return name.GetText()
+	var name string
+	if word := ctx.NAME(); word != nil {
+		name = word.GetText()
+	} else {
+		name = ctx.COL().GetText()
 	}
-	return ctx.COL().GetText()
+	if digits := ctx.NUMBER(); digits != nil {
+		name += digits.GetText()
+	}
+	return name
 }
 
 // buildArgs builds each argument expression; a nil arg list is no arguments.

@@ -106,8 +106,10 @@ func TestBuild_Call(t *testing.T) {
 	assert.Equal(t, "sum", multi.Name)
 	assert.Len(t, multi.Args, 2)
 
-	assert.Equal(t, "IF", parse(t, "IF(1, 2, 3)").(tsvt.Call).Name) // name via COL
-	assert.Empty(t, parse(t, "now()").(tsvt.Call).Args)             // no arguments
+	assert.Equal(t, "IF", parse(t, "IF(1, 2, 3)").(tsvt.Call).Name)    // name via COL
+	assert.Empty(t, parse(t, "now()").(tsvt.Call).Args)                // no arguments
+	assert.Equal(t, "atan2", parse(t, "atan2(1, 1)").(tsvt.Call).Name) // trailing digits folded in
+	assert.Equal(t, "log10", parse(t, "log10(100)").(tsvt.Call).Name)
 }
 
 func TestBuild_FractionalRowRejected(t *testing.T) {
