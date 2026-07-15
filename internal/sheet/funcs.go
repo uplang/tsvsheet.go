@@ -114,6 +114,9 @@ func (r resolver) evalLazy(name funcName, args []tsvt.Expr) (Value, boolResult) 
 	if v, ok := r.evalArray(name, args); ok {
 		return v, true
 	}
+	if v, ok := r.evalEmbed(name, args); ok {
+		return v, true
+	}
 	return r.evalInspector(name, args)
 }
 
@@ -277,6 +280,7 @@ var functions = map[string]function{
 	"concat":  {impl: fnConcat, minArgs: 1, maxArgs: -1},
 	"len":     {impl: fnLen, minArgs: 1, maxArgs: 1},
 	"mod":     {impl: fnMod, minArgs: 2, maxArgs: 2},
+	"output":  {impl: outputValue, minArgs: 1, maxArgs: 1},
 
 	// Phase 1 — math & trig.
 	"pi":       {impl: fnPi, minArgs: 0, maxArgs: 0},

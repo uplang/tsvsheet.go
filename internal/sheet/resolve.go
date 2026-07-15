@@ -22,6 +22,7 @@ const (
 // the same state. now is the wall clock sampled once for the pass (volatile
 // functions).
 type computer struct {
+	env   embedEnv
 	now   time.Time
 	sheet Sheet
 	cache [][]Value

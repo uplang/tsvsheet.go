@@ -9,6 +9,7 @@ package session
 import (
 	"bytes"
 	"sync"
+	"time"
 
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
@@ -26,6 +27,8 @@ type State struct {
 
 // Session is a mutable spreadsheet. Its methods are safe for concurrent use.
 type Session struct {
+	loader      sheet.Loader
+	base        sheet.Path
 	sheet       sheet.Sheet
 	computed    sheet.Grid
 	diagnostics []sheet.Diagnostic
@@ -33,21 +36,29 @@ type Session struct {
 	isDirty     bool
 }
 
-// New parses spreadsheet source and computes it eagerly. It fails on a syntax
-// error; the resulting session is clean (not dirty).
+// New parses spreadsheet source and computes it eagerly, with no sheet loader —
+// SHEET(...) cells resolve to #REF!. It fails on a syntax error; the resulting
+// session is clean (not dirty).
 func New(src []byte) (*Session, error) {
+	return NewEmbeddable(src, nil, "")
+}
+
+// NewEmbeddable is New with an injected sheet loader and this sheet's own path,
+// so SHEET(...) cells embed other sheets resolved through loader.
+func NewEmbeddable(src []byte, loader sheet.Loader, base sheet.Path) (*Session, error) {
 	parsed, err := sheet.Parse(src)
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{sheet: parsed}
+	s := &Session{sheet: parsed, loader: loader, base: base}
 	s.recompute()
 	return s, nil
 }
 
-// recompute re-evaluates the current sheet and refreshes the read model.
+// recompute re-evaluates the current sheet and refreshes the read model. It uses
+// the injected loader (nil disables embedding) and samples the clock once.
 func (s *Session) recompute() {
-	s.computed = s.sheet.Compute()
+	s.computed = s.sheet.ComputeWith(sheet.ComputeOptions{At: time.Now(), Loader: s.loader, Base: s.base})
 	s.diagnostics = sheet.Check(s.sheet)
 }
 

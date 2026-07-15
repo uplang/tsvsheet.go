@@ -41,6 +41,18 @@ func TestReferences_PrecedentsAndDependents(t *testing.T) {
 	assert.Equal(t, []sheet.Address{{Row: 1, Col: 3}}, deps) // B2 read by D2
 }
 
+func TestNewEmbeddable_ResolvesSheetOutput(t *testing.T) {
+	t.Parallel()
+
+	loader := func(_, ref sheet.Path) (sheet.Sheet, sheet.Path, error) {
+		s, err := sheet.Parse([]byte("=output(7)\n"))
+		return s, ref, err
+	}
+	s, err := session.NewEmbeddable([]byte("=sheet(\"child\")\n"), loader, "root")
+	require.NoError(t, err)
+	assert.Equal(t, "7", s.Snapshot().Computed[0][0])
+}
+
 func TestInsertRow_GrowsAndDirties(t *testing.T) {
 	t.Parallel()
 

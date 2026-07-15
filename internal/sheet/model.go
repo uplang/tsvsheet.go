@@ -87,7 +87,13 @@ func (s Sheet) Compute() Grid { return s.ComputeAt(time.Now()) }
 // deterministic within a pass (and testable). It computes every cell's value,
 // then renders — spilling dynamic-array results into empty neighbours.
 func (s Sheet) ComputeAt(at time.Time) Grid {
-	comp := newComputer(s, at)
+	return s.computeGrid(newComputer(s, at))
+}
+
+// computeGrid evaluates every cell through comp and renders the value grid,
+// spilling any dynamic-array results. It is the shared body of ComputeAt (plain)
+// and ComputeWith (with an embedded-sheet loader).
+func (s Sheet) computeGrid(comp computer) Grid {
 	values := make([][]Value, len(s.cells))
 	for r, row := range s.cells {
 		values[r] = make([]Value, len(row))

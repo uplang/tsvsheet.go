@@ -3,11 +3,14 @@ package cli
 import (
 	"io"
 	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/loader"
 	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/uplang/tsvsheet.go/internal/sheet"
 	"github.com/uplang/tsvsheet.go/internal/tui"
 )
 
@@ -37,11 +40,15 @@ func loadEditable(source sourcePath) (*session.Session, func() error, error) {
 		const msg = "requires a spreadsheet file path (e.g. `tsvsheet serve sheet.tsvt`)"
 		return nil, nil, constants.ErrInvalidValue.With(nil, "message", msg)
 	}
-	src, err := os.ReadFile(string(source))
+	path := filepath.Clean(string(source))
+	src, err := os.ReadFile(path)
 	if err != nil {
-		return nil, nil, constants.ErrOpenFile.With(err, string(source))
+		return nil, nil, constants.ErrOpenFile.With(err, path)
 	}
-	sess, err := session.New(src)
+	// Resolve SHEET(...) references within the spreadsheet's own directory, with
+	// this file as the base — so embedded sub-sheets work in serve and the TUI.
+	load := loader.FS(loader.Dir(filepath.Dir(path)))
+	sess, err := session.NewEmbeddable(src, load, sheet.Path(filepath.Base(path)))
 	if err != nil {
 		return nil, nil, err
 	}

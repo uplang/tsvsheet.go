@@ -1,14 +1,19 @@
 package cli
 
 import (
+	"path/filepath"
+	"time"
+
 	"github.com/urfave/cli/v3"
 
+	"github.com/uplang/tsvsheet.go/internal/loader"
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
-// runRender parses the spreadsheet, computes it, and writes the resulting value
-// grid as TSV. Errors go to the caller (and thence stderr); stdout carries only
-// the computed grid, so render composes in unix pipelines.
+// runRender parses the spreadsheet, computes it (resolving SHEET(...) references
+// when the source is a file), and writes the resulting value grid as TSV.
+// Errors go to the caller (and thence stderr); stdout carries only the computed
+// grid, so render composes in unix pipelines.
 func runRender(streams Streams, source sourcePath) error {
 	reader, release, err := source.open(streams.In)
 	if err != nil {
@@ -20,7 +25,22 @@ func runRender(streams Streams, source sourcePath) error {
 	if err != nil {
 		return err
 	}
-	return sheet.WriteTSV(streams.Out, parsed.Compute())
+	return sheet.WriteTSV(streams.Out, parsed.ComputeWith(computeOptions(source)))
+}
+
+// computeOptions builds the compute options for a source: a filesystem sheet
+// loader rooted at the file's directory (so SHEET embeds sibling sheets), or no
+// loader for stdin (SHEET resolves to #REF!).
+func computeOptions(source sourcePath) sheet.ComputeOptions {
+	if source.isStdin() {
+		return sheet.ComputeOptions{At: time.Now()}
+	}
+	path := filepath.Clean(string(source))
+	return sheet.ComputeOptions{
+		At:     time.Now(),
+		Loader: loader.FS(loader.Dir(filepath.Dir(path))),
+		Base:   sheet.Path(filepath.Base(path)),
+	}
 }
 
 // renderCommand builds the `render` command.

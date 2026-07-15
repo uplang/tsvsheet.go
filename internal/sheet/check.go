@@ -46,7 +46,7 @@ func unknownFunctions(expr tsvt.Expr, at Address) []Diagnostic {
 func isKnownFunc(name funcName) boolResult {
 	lower := funcName(strings.ToLower(string(name)))
 	if isConditional(lower) || isTable(lower) || isCriteria(lower) || isArray(lower) ||
-		lower == "today" || lower == "now" {
+		isEmbed(lower) || lower == "today" || lower == "now" {
 		return true
 	}
 	if _, ok := inspectors[string(lower)]; ok {
