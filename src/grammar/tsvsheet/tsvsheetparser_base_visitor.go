@@ -3,7 +3,6 @@
 package tsvsheetgrammar // TsvsheetParser
 import "github.com/antlr4-go/antlr/v4"
 
-
 type BaseTsvsheetParserVisitor struct {
 	*antlr.BaseParseTreeVisitor
 }

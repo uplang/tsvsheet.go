@@ -92,19 +92,58 @@ func TestCompute_Comparison(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]string{
-		"A1 = A1":  "1",
-		"A1 = C1":  "0",
-		"A1 <> C1": "1",
-		"A1 < C1":  "1",
-		"A1 <= A1": "1",
-		"D1 > C1":  "1",
-		"D1 >= D1": "1",
-		"D1 < C1":  "0",
+		"A1 = A1":  "TRUE",
+		"A1 = C1":  "FALSE",
+		"A1 <> C1": "TRUE",
+		"A1 < C1":  "TRUE",
+		"A1 <= A1": "TRUE",
+		"D1 > C1":  "TRUE",
+		"D1 >= D1": "TRUE",
+		"D1 < C1":  "FALSE",
+		// A comparison of two booleans compares their 1/0 values.
+		"(A1 < C1) = (D1 > C1)":  "TRUE",
+		"(A1 < C1) <> (D1 < C1)": "TRUE",
 	}
 	for expr, want := range cases {
 		t.Run(expr, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, want, formula1(t, expr))
+		})
+	}
+}
+
+func TestCompute_BooleanCoercion(t *testing.T) {
+	t.Parallel()
+
+	// A1=2, C1=3. A boolean coerces to 1/0 in arithmetic.
+	assert.Equal(t, "1", formula1(t, "(A1 < C1) + 0")) // TRUE + 0
+	assert.Equal(t, "0", formula1(t, "(A1 > C1) * 5")) // FALSE * 5
+}
+
+func TestCompute_AverageAlias(t *testing.T) {
+	t.Parallel()
+
+	// A2=5 B2=6 C2=7. `average` is an alias of `avg`.
+	assert.Equal(t, "6", formula1(t, "average(A2:C2)"))
+}
+
+func TestCompute_NonNumericIsValueError(t *testing.T) {
+	t.Parallel()
+
+	// A1 holds text; every numeric operation over it is #VALUE!.
+	cases := map[string]string{
+		"=sum(A1)":      "#VALUE!",
+		"=min(A1)":      "#VALUE!",
+		"=max(A1)":      "#VALUE!",
+		"=avg(A1)":      "#VALUE!",
+		"=abs(A1)":      "#VALUE!",
+		"=round(A1)":    "#VALUE!",
+		"=round(2, A1)": "#VALUE!", // non-numeric place count
+	}
+	for expr, want := range cases {
+		t.Run(expr, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, want, cellAt(t, compute(t, "hi\t"+expr+"\n"), 0, 1))
 		})
 	}
 }

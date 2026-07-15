@@ -3,7 +3,6 @@
 package tsvsheetgrammar // TsvsheetParser
 import "github.com/antlr4-go/antlr/v4"
 
-
 // TsvsheetParserListener is a complete listener for a parse tree produced by TsvsheetParser.
 type TsvsheetParserListener interface {
 	antlr.ParseTreeListener

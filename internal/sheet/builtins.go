@@ -62,13 +62,12 @@ func extreme(args []Value, pick func(a, b float64) float64) Value {
 	return numberValue(floatVal(best))
 }
 
-// fnCount counts the non-empty operands; an error operand propagates (rule 3).
+// fnCount counts the non-empty operands (error operands are short-circuited by
+// the eager dispatcher before they reach here). COUNTA-style; COUNT's
+// numbers-only variant arrives with the statistical phase.
 func fnCount(args []Value) Value {
 	count := 0
 	for _, arg := range args {
-		if arg.isError() {
-			return arg
-		}
 		if arg.kind != kindEmpty {
 			count++
 		}
@@ -92,12 +91,9 @@ func fnAvg(args []Value) Value {
 	return numberValue(floatVal(total / float64(len(nums))))
 }
 
-// fnAbs is the absolute value of a single numeric operand; a wrong arity is
-// #VALUE!.
+// fnAbs is the absolute value of a single numeric operand; a non-numeric operand
+// is #VALUE!. Arity is enforced by the registry.
 func fnAbs(args []Value) Value {
-	if len(args) != 1 {
-		return errorValue(ErrValue)
-	}
 	n, v := args[0].asNumber()
 	if v.isError() {
 		return v
@@ -106,11 +102,8 @@ func fnAbs(args []Value) Value {
 }
 
 // fnRound rounds its first operand to the integer place count of its second
-// (default 0); a wrong arity is #VALUE!.
+// (default 0). Arity (1 or 2) is enforced by the registry.
 func fnRound(args []Value) Value {
-	if len(args) == 0 || len(args) > 2 {
-		return errorValue(ErrValue)
-	}
 	n, v := args[0].asNumber()
 	if v.isError() {
 		return v
@@ -134,26 +127,18 @@ func roundPlaces(args []Value) (places decimalPlaces, bad Value, isOK bool) {
 	return decimalPlaces(p), Value{}, true
 }
 
-// fnConcat joins the string forms of its operands; an error operand propagates.
+// fnConcat joins the string forms of its operands (error operands are
+// short-circuited by the eager dispatcher).
 func fnConcat(args []Value) Value {
 	var b strings.Builder
 	for _, arg := range args {
-		if arg.isError() {
-			return arg
-		}
 		_, _ = b.WriteString(arg.String())
 	}
 	return stringValue(textVal(b.String()))
 }
 
-// fnLen is the length of a single operand's string form; a wrong arity is
-// #VALUE!.
+// fnLen is the length of a single operand's string form. Arity is enforced by
+// the registry; errors are short-circuited before they reach here.
 func fnLen(args []Value) Value {
-	if len(args) != 1 {
-		return errorValue(ErrValue)
-	}
-	if args[0].isError() {
-		return args[0]
-	}
 	return numberValue(floatVal(len(args[0].String())))
 }

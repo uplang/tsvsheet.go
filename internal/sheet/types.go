@@ -27,4 +27,6 @@ type (
 	offsetVal int
 	// rowNumber is a 1-based absolute data row (as written `C$4`).
 	rowNumber int
+	// argCount is a number of arguments passed to a function call.
+	argCount int
 )

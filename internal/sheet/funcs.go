@@ -11,11 +11,11 @@ import (
 // operands (ADR 0003 rule 14).
 func mod(l, r floatVal) floatVal { return floatVal(math.Mod(float64(l), float64(r))) }
 
-// compare applies a §11 comparison, yielding 1 (true) or 0 (false): numeric
-// when both operands are numeric, lexicographic when both are strings, #VALUE!
-// for mixed (ADR 0003 rule 12).
+// compare applies a comparison, yielding a boolean TRUE/FALSE (ADR 0004 §1):
+// numeric when both operands are numeric (a bool compares as its 1/0), and
+// lexicographic when both are strings; a mixed pair is #VALUE!.
 func compare(op tsvt.BinaryOp, left, right Value) Value {
-	if left.kind == kindNumber && right.kind == kindNumber {
+	if numericish(left) && numericish(right) {
 		return boolValue(boolResult(numberOrder(op, floatVal(left.num), floatVal(right.num))))
 	}
 	if bothText(left, right) {
@@ -23,6 +23,10 @@ func compare(op tsvt.BinaryOp, left, right Value) Value {
 	}
 	return errorValue(ErrValue)
 }
+
+// numericish reports whether a value participates in numeric comparison — a
+// number or a boolean (whose 1/0 lives in the number field).
+func numericish(v Value) bool { return v.kind == kindNumber || v.kind == kindBool }
 
 // bothText reports whether both operands compare as text (string or empty).
 func bothText(left, right Value) bool {
@@ -38,14 +42,6 @@ func text(v Value) string {
 		return v.str
 	}
 	return ""
-}
-
-// boolValue maps a Go bool to the 1/0 numeric result of a comparison.
-func boolValue(isTrue boolResult) Value {
-	if isTrue {
-		return numberValue(1)
-	}
-	return numberValue(0)
 }
 
 // numberOrder evaluates a comparison over two numbers.
@@ -71,9 +67,9 @@ func stringOrder(op tsvt.BinaryOp, l, r textVal) bool {
 	return numberOrder(op, floatVal(strings.Compare(string(l), string(r))), 0)
 }
 
-// evalCall dispatches a function call by case-insensitive name (§11.3); an
-// unknown name is #NAME? (ADR 0003 rule 10). `if` is handled separately because
-// it evaluates its branches lazily (rule 3), so it must not pre-evaluate args.
+// evalCall dispatches a function call by case-insensitive name (ADR 0004 §2);
+// an unknown name is #NAME? and a call outside the function's arity bounds is
+// #VALUE!.
 func (r resolver) evalCall(call tsvt.Call) Value {
 	name := strings.ToLower(call.Name)
 	if name == "if" {
@@ -83,11 +79,44 @@ func (r resolver) evalCall(call tsvt.Call) Value {
 	if !known {
 		return errorValue(ErrName)
 	}
-	return fn(r.argValues(call.Args))
+	if !fn.accepts(argCount(len(call.Args))) {
+		return errorValue(ErrValue)
+	}
+	values := r.argValues(call.Args)
+	if bad, found := firstError(values); found {
+		return bad
+	}
+	return fn.impl(values)
 }
 
-// evalIf evaluates `if(cond, a, b)` lazily: only cond and the selected branch
-// are evaluated (ADR 0003 rule 3). A wrong arity is #VALUE!.
+// function is a registered eager builtin: its arity bounds and its impl over
+// pre-evaluated, error-free argument values (ADR 0004 §2). Lazy builtins that
+// evaluate their own arguments (currently only `if`) are dispatched separately
+// so the registry stays a cycle-free var initializer.
+type function struct {
+	impl    func(args []Value) Value
+	minArgs argCount
+	maxArgs argCount // negative means variadic (unbounded)
+}
+
+// accepts reports whether n arguments fall within the function's arity bounds.
+func (f function) accepts(n argCount) bool {
+	return n >= f.minArgs && (f.maxArgs < 0 || n <= f.maxArgs)
+}
+
+// firstError returns the first error value among values, left to right.
+func firstError(values []Value) (Value, boolResult) {
+	for _, v := range values {
+		if v.isError() {
+			return v, true
+		}
+	}
+	return Value{}, false
+}
+
+// evalIf evaluates `if(cond, then, else)` lazily: only cond and the selected
+// branch are evaluated (ADR 0004 §2). A wrong arity is #VALUE!; an error
+// condition propagates.
 func (r resolver) evalIf(args []tsvt.Expr) Value {
 	if len(args) != 3 {
 		return errorValue(ErrValue)
@@ -102,10 +131,7 @@ func (r resolver) evalIf(args []tsvt.Expr) Value {
 	return r.eval(args[2])
 }
 
-// builtin is a function over already-evaluated argument values.
-type builtin func(args []Value) Value
-
-// aggregateArgs flattens call arguments into their resolved cell values so an
+// argValues flattens call arguments into their resolved cell values so an
 // aggregate sees every cell of a range argument (§11.3).
 func (r resolver) argValues(args []tsvt.Expr) []Value {
 	values := make([]Value, 0, len(args))
@@ -125,16 +151,18 @@ func (r resolver) argCells(arg tsvt.Expr) []Value {
 	return []Value{r.eval(arg)}
 }
 
-// functions is the case-insensitive builtin set (ADR 0003 rule 10). `if` is
-// dispatched separately in evalCall because it is lazy.
-var functions = map[string]builtin{
-	"sum":    fnSum,
-	"min":    fnMin,
-	"max":    fnMax,
-	"count":  fnCount,
-	"avg":    fnAvg,
-	"abs":    fnAbs,
-	"round":  fnRound,
-	"concat": fnConcat,
-	"len":    fnLen,
+// functions is the case-insensitive eager builtin registry (ADR 0004 §2); `if`
+// is dispatched separately (evalCall/isKnownFunc) because it is lazy, which also
+// keeps this a cycle-free var initializer.
+var functions = map[string]function{
+	"sum":     {impl: fnSum, minArgs: 1, maxArgs: -1},
+	"min":     {impl: fnMin, minArgs: 1, maxArgs: -1},
+	"max":     {impl: fnMax, minArgs: 1, maxArgs: -1},
+	"count":   {impl: fnCount, minArgs: 1, maxArgs: -1},
+	"avg":     {impl: fnAvg, minArgs: 1, maxArgs: -1},
+	"average": {impl: fnAvg, minArgs: 1, maxArgs: -1},
+	"abs":     {impl: fnAbs, minArgs: 1, maxArgs: 1},
+	"round":   {impl: fnRound, minArgs: 1, maxArgs: 2},
+	"concat":  {impl: fnConcat, minArgs: 1, maxArgs: -1},
+	"len":     {impl: fnLen, minArgs: 1, maxArgs: 1},
 }

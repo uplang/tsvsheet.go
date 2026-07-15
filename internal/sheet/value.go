@@ -20,13 +20,14 @@ const (
 	ErrCirc  ErrorValue = "#CIRC!"
 )
 
-// valueKind tags the three inhabited value shapes plus empty.
+// valueKind tags the inhabited value shapes plus empty.
 type valueKind int
 
 const (
 	kindEmpty valueKind = iota
 	kindNumber
 	kindString
+	kindBool
 	kindError
 )
 
@@ -45,6 +46,15 @@ func numberValue(n floatVal) Value { return Value{kind: kindNumber, num: float64
 
 // stringValue wraps a text result.
 func stringValue(s textVal) Value { return Value{kind: kindString, str: string(s)} }
+
+// boolValue wraps a boolean result; the number field carries 1 (true) or 0
+// (false) so a bool coerces to a number for free.
+func boolValue(isTrue boolResult) Value {
+	if isTrue {
+		return Value{kind: kindBool, num: 1}
+	}
+	return Value{kind: kindBool, num: 0}
+}
 
 // errorValue wraps an error value.
 func errorValue(e ErrorValue) Value { return Value{kind: kindError, str: string(e)} }
@@ -84,6 +94,11 @@ func (v Value) String() string {
 	switch v.kind {
 	case kindNumber:
 		return strconv.FormatFloat(v.num, 'f', -1, 64)
+	case kindBool:
+		if v.num != 0 {
+			return "TRUE"
+		}
+		return "FALSE"
 	case kindString, kindError:
 		return v.str
 	default:
@@ -99,7 +114,7 @@ func (v Value) asNumber() (float64, Value) {
 	switch v.kind {
 	case kindEmpty:
 		return 0, emptyValue()
-	case kindNumber:
+	case kindNumber, kindBool:
 		return v.num, v
 	case kindError:
 		return 0, v
@@ -115,7 +130,7 @@ func (v Value) truthy() (bool, Value) {
 	switch v.kind {
 	case kindError:
 		return false, v
-	case kindNumber:
+	case kindNumber, kindBool:
 		return v.num != 0, v
 	case kindString:
 		return v.str != "", v

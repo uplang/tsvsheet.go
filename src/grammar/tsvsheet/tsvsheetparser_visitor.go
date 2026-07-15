@@ -3,7 +3,6 @@
 package tsvsheetgrammar // TsvsheetParser
 import "github.com/antlr4-go/antlr/v4"
 
-
 // A complete Visitor for a parse tree produced by TsvsheetParser.
 type TsvsheetParserVisitor interface {
 	antlr.ParseTreeVisitor
@@ -103,5 +102,4 @@ type TsvsheetParserVisitor interface {
 
 	// Visit a parse tree produced by TsvsheetParser#argList.
 	VisitArgList(ctx *ArgListContext) interface{}
-
 }
