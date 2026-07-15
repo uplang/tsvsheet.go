@@ -133,6 +133,17 @@ func TestRunServe_LoadError(t *testing.T) {
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }
 
+func TestRunServe_NonLoopbackWarns(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// A non-loopback host logs a warning, then shuts down on the cancelled ctx.
+	err := runServe(ctx, serveConfig{source: sheetFile(t), host: "0.0.0.0", port: 0})
+	require.NoError(t, err)
+}
+
 func TestServeCommand_Integration(t *testing.T) {
 	t.Parallel()
 

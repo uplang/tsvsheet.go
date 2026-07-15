@@ -297,6 +297,37 @@ func TestRecompute_ReturnsFreshState(t *testing.T) {
 	assert.Equal(t, "5", state.Computed[1][3]) // D2 recomputed
 }
 
+func TestCSRF_CrossSiteMutationRefused(t *testing.T) {
+	t.Parallel()
+
+	// A cross-site state-changing request is refused (403); a safe GET is not.
+	srv, _ := testServer(t)
+
+	save := httptest.NewRequest(http.MethodPost, "/api/save", nil)
+	save.Header.Set("Sec-Fetch-Site", "cross-site")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, save)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+
+	read := httptest.NewRequest(http.MethodGet, "/api/state", nil)
+	read.Header.Set("Sec-Fetch-Site", "cross-site") // safe method → allowed
+	rec = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, read)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestCSRF_SameOriginMutationAllowed(t *testing.T) {
+	t.Parallel()
+
+	// A same-origin mutation passes the guard.
+	srv, _ := testServer(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/save", nil)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
 func TestUI_ServesHTML(t *testing.T) {
 	t.Parallel()
 

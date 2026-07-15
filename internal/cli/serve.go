@@ -33,6 +33,11 @@ func serveCommand() *cli.Command {
 is a required positional file path (serve saves edits back to it, so stdin is
 not accepted).
 
+This is a single-user local editor: the browser reads and WRITES host files
+(Save overwrites the sheet, and references can read its directory). It binds
+127.0.0.1 by default and refuses cross-origin requests; do not bind a
+non-loopback --host on an untrusted network.
+
 Examples:
   tsvsheet serve sheet.tsvt
   tsvsheet serve --host 0.0.0.0 --port 8080 sheet.tsvt`,

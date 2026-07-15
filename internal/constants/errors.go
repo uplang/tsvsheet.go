@@ -10,6 +10,7 @@ import errs "github.com/gomatic/go-error"
 // Keep these constants sorted alphabetically.
 const (
 	ErrDiagnostics     errs.Const = "sheet has diagnostics"
+	ErrForbidden       errs.Const = "cross-origin request refused"
 	ErrInvalidName     errs.Const = "invalid name"
 	ErrInvalidValue    errs.Const = "invalid value"
 	ErrMissingArgument errs.Const = "missing required argument"

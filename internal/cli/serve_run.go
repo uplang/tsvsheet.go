@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -28,6 +29,15 @@ func runServe(ctx context.Context, cfg serveConfig) error {
 	server, err := loadServer(cfg)
 	if err != nil {
 		return err
+	}
+	ip := net.ParseIP(cfg.host)
+	isLoopback := cfg.host == "localhost" || (ip != nil && ip.IsLoopback())
+	if !isLoopback {
+		slog.Warn(
+			"serving on a non-loopback address exposes the sheet's directory to the network; the browser editor reads and writes host files",
+			"host",
+			cfg.host,
+		)
 	}
 	http := httpserver.New(slog.Default(), httpserver.Host(cfg.host), httpserver.Port(cfg.port), server.Handler())
 	slog.Info("serving spreadsheet", "url", "http://"+http.Addr())

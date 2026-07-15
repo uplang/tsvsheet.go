@@ -59,7 +59,26 @@ func (srv Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/structure", srv.handleStructure)
 	mux.HandleFunc("GET /api/embedded", srv.handleEmbedded)
 	mux.Handle("GET /", uiHandler())
-	return mux
+	return guardCSRF(mux)
+}
+
+// guardCSRF refuses cross-origin state-changing requests. serve is a local
+// single-user editor whose saves write host files, so it binds loopback by
+// default; but a page open in the operator's browser can still fire a "simple"
+// cross-origin POST at it (a CSRF write it cannot read back). A browser stamps
+// such a request Sec-Fetch-Site: cross-site|same-site, which script cannot
+// forge, so mutating requests carrying it are refused; safe methods (GET/HEAD)
+// and non-browser clients (no Sec-Fetch-Site, e.g. curl) pass through.
+func guardCSRF(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		isMutating := r.Method != http.MethodGet && r.Method != http.MethodHead
+		site := r.Header.Get("Sec-Fetch-Site")
+		if isMutating && (site == "cross-site" || site == "same-site") {
+			writeError(w, http.StatusForbidden, constants.ErrForbidden.With(nil))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // configResponse is the GET /api/config body: the delay until the first
