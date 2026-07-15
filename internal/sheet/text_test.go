@@ -64,6 +64,7 @@ func TestText_ErrorsAndEdges(t *testing.T) {
 		`mid("hi", 0, 1)`:               v, // start below 1
 		`mid("hi", 1, -1)`:              v, // negative length
 		`rept("a", -1)`:                 v, // negative count
+		`rept("ab", 2000000)`:           v, // result (4 MB) exceeds the byte budget (OOM guard)
 		`replace("hi", 0, 1, "x")`:      v,
 		`char(0)`:                       v,                   // code below 1
 		`code("")`:                      v,                   // empty text

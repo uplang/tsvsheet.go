@@ -259,6 +259,9 @@ func (s Sheet) Set(addr Address, text string) (Sheet, error) {
 	if addr.Row < 0 || addr.Col < 0 {
 		return Sheet{}, constants.ErrInvalidValue.With(nil, "address", addr.String())
 	}
+	if addr.Row >= active.GridDim || addr.Col >= active.GridDim {
+		return Sheet{}, constants.ErrInvalidValue.With(nil, "address exceeds the grid limit", addr.String())
+	}
 	parsed, err := parseCell(textVal(text), rowIndex(addr.Row), colIndex(addr.Col))
 	if err != nil {
 		return Sheet{}, err

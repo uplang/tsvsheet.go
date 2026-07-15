@@ -51,6 +51,9 @@ func (r resolver) arraySequence(args []tsvt.Expr) Value {
 	if rows < 1 || cols < 1 {
 		return errorValue(ErrValue)
 	}
+	if tooManyCells(int(rows), int(cols)) {
+		return errorValue(ErrValue) // result exceeds the cell budget
+	}
 	return arrayValue(sequenceMatrix(rows, cols))
 }
 

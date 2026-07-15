@@ -78,14 +78,16 @@ func TestArray_Errors(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]string{
-		"sequence()":        string(sheet.ErrValue), // arity
-		"sequence(0)":       string(sheet.ErrValue), // rows < 1
-		"sequence(1, 0)":    string(sheet.ErrValue), // cols < 1
-		"transpose(A1, A2)": string(sheet.ErrValue), // arity
-		"unique(A1, A2)":    string(sheet.ErrValue),
-		"sort(A1, A2)":      string(sheet.ErrValue),
-		"filter(A1)":        string(sheet.ErrValue),
-		"flatten(A1, A2)":   string(sheet.ErrValue),
+		"sequence()":          string(sheet.ErrValue), // arity
+		"sequence(0)":         string(sheet.ErrValue), // rows < 1
+		"sequence(1, 0)":      string(sheet.ErrValue), // cols < 1
+		"sequence(6000000)":   string(sheet.ErrValue), // exceeds the default cell budget (OOM guard)
+		"sequence(3000,3000)": string(sheet.ErrValue), // rows×cols (9M) exceeds the budget
+		"transpose(A1, A2)":   string(sheet.ErrValue), // arity
+		"unique(A1, A2)":      string(sheet.ErrValue),
+		"sort(A1, A2)":        string(sheet.ErrValue),
+		"filter(A1)":          string(sheet.ErrValue),
+		"flatten(A1, A2)":     string(sheet.ErrValue),
 	}
 	for expr, want := range cases {
 		t.Run(expr, func(t *testing.T) {

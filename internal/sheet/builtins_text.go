@@ -125,7 +125,11 @@ func fnRept(args []Value) Value {
 	if n < 0 {
 		return errorValue(ErrValue)
 	}
-	return stringValue(textVal(strings.Repeat(argText(args, 0), int(n))))
+	text := argText(args, 0)
+	if len(text) > 0 && int64(n)*int64(len(text)) > int64(active.ResultBytes) {
+		return errorValue(ErrValue) // result exceeds the byte budget
+	}
+	return stringValue(textVal(strings.Repeat(text, int(n))))
 }
 
 // fnExact is TRUE iff two operands have identical (case-sensitive) text.

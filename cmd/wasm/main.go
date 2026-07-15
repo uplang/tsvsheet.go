@@ -21,7 +21,8 @@ import (
 var state *session.Session
 
 func main() {
-	state, _ = session.New([]byte("")) // start empty; load() replaces it
+	sheet.SetLimits(sheet.BrowserLimits) // tighter OOM ceilings, sized for a browser tab
+	state, _ = session.New([]byte(""))   // start empty; load() replaces it
 
 	obj := js.Global().Get("Object").New()
 	obj.Set("load", js.FuncOf(load))

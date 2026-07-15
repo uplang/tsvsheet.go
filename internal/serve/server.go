@@ -259,9 +259,14 @@ func (srv Server) handleEmbedded(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, embeddedResponse{Path: string(path), Grid: grid})
 }
 
+// maxRequestBytes bounds a request body so a large or slow upload cannot
+// exhaust memory; a cell edit is tiny and even a full sheet load fits easily.
+const maxRequestBytes = 32 << 20 // 32 MiB
+
 // decode reads a JSON request body into v, writing a 400 and returning false on
-// a malformed body.
+// a malformed or over-large body.
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return false

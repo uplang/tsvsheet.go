@@ -112,6 +112,13 @@ func TestSet_RejectsNegativeAddress(t *testing.T) {
 	_, err = s.Set(sheet.Address{Row: -1, Col: 0}, "x")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+
+	// An address beyond the grid limit is rejected before growing (OOM guard).
+	_, err = s.Set(sheet.Address{Row: 2_000_000, Col: 0}, "x")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+	_, err = s.Set(sheet.Address{Row: 0, Col: 2_000_000}, "x")
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }
 
 func TestSource_RoundTrips(t *testing.T) {

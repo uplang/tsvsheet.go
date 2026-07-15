@@ -6,6 +6,8 @@ import (
 
 	golog "github.com/gomatic/go-log"
 	"github.com/urfave/cli/v3"
+
+	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
 const (
@@ -72,7 +74,7 @@ func Command(v Version) *cli.Command {
 		EnableShellCompletion: true,
 		DefaultCommand:        cmdRender,
 		Before:                configureLogger,
-		Flags:                 loggerFlags(),
+		Flags:                 append(loggerFlags(), maxCellsFlag()),
 		Commands: []*cli.Command{
 			renderCommand(),
 			parseCommand(),
@@ -86,10 +88,23 @@ func Command(v Version) *cli.Command {
 }
 
 // configureLogger installs the default structured logger from the parsed
-// logging flags.
-func configureLogger(ctx context.Context, _ *cli.Command) (context.Context, error) {
+// logging flags and applies the --max-cells resource cap when set.
+func configureLogger(ctx context.Context, c *cli.Command) (context.Context, error) {
 	slog.SetDefault(loggerConfig.NewLogger(stderr))
+	if n := int(c.Int("max-cells")); n > 0 {
+		sheet.SetLimits(sheet.Limits{ResultCells: n, GridDim: n, ResultBytes: n})
+	}
 	return ctx, nil
+}
+
+// maxCellsFlag caps how large any single formula result or grid may grow, so an
+// untrusted sheet cannot exhaust memory. Zero (the default) keeps DefaultLimits.
+func maxCellsFlag() cli.Flag {
+	return &cli.IntFlag{
+		Name:  "max-cells",
+		Usage: "cap on the cells, grid dimension, and bytes a single formula result or grid may reach (0 = built-in default)",
+		Value: 0,
+	}
 }
 
 // loggerFlags builds the global --log-level / --log-format flags.

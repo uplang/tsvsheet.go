@@ -12,7 +12,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
+
+// TestCLI_MaxCellsCap proves --max-cells narrows the process-wide OOM cap: with
+// a 5-cell budget a SEQUENCE(10) is rejected. Not parallel — it mutates the
+// package-global limits, so it runs to completion (and resets) before any
+// t.Parallel test resumes.
+func TestCLI_MaxCellsCap(t *testing.T) {
+	t.Cleanup(func() { sheet.SetLimits(sheet.DefaultLimits) })
+	path := writeTemp(t, "big.tsvt", "=sequence(10)\n")
+	out, err := runCLI(t, "--max-cells", "5", "render", path)
+	require.NoError(t, err)
+	assert.Contains(t, out, "#VALUE!") // 10 cells exceeds the 5-cell cap
+}
 
 // withStdin swaps the package stdin for the duration of a test.
 func withStdin(t *testing.T, in string) {
@@ -158,7 +171,7 @@ func TestConfigureLogger(t *testing.T) {
 	stderr = io.Discard
 	t.Cleanup(func() { stderr = prevStderr })
 
-	_, err := configureLogger(context.Background(), nil)
+	_, err := configureLogger(context.Background(), Command("test"))
 	require.NoError(t, err)
 }
 
