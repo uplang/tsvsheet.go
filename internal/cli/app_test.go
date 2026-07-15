@@ -81,6 +81,21 @@ func TestCLI_CheckClean(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCLI_AllowAnyPaths(t *testing.T) {
+	// A sheet cross-referencing an absolute path outside its own directory:
+	// confined (default) refuses it (#REF!); --allow-any-paths reads it.
+	ext := writeTemp(t, "ext.tsvt", "99\n")
+	main := writeTemp(t, "main.tsvt", "=\""+ext+"\"!A1\n")
+
+	confined, err := runCLI(t, "render", main)
+	require.NoError(t, err)
+	assert.Contains(t, confined, "#REF!")
+
+	unconfined, err := runCLI(t, "render", "--allow-any-paths", main)
+	require.NoError(t, err)
+	assert.Contains(t, unconfined, "99")
+}
+
 func TestCLI_ExplainCell(t *testing.T) {
 	path := writeTemp(t, "s.tsvt", sampleSheet)
 	out, err := runCLI(t, "explain", "C1", path)
@@ -143,7 +158,7 @@ func TestRunParse_ReadError(t *testing.T) {
 	t.Parallel()
 
 	streams := Streams{In: failReader{}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	err := runParse(streams, "-", false)
+	err := runParse(streams, "-", false, false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
@@ -152,7 +167,7 @@ func TestRunRender_ReadError(t *testing.T) {
 	t.Parallel()
 
 	streams := Streams{In: failReader{}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	err := runRender(streams, "-")
+	err := runRender(streams, "-", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }

@@ -27,7 +27,7 @@ type valueOutput bool
 // runParse parses a spreadsheet and writes its non-empty cells as JSON — a
 // stable, jq-friendly surface for scripting. When isValues is set, each cell
 // also carries its computed value (the sheet is evaluated, resolving embeds).
-func runParse(streams Streams, source sourcePath, isValues valueOutput) error {
+func runParse(streams Streams, source sourcePath, isValues valueOutput, isUnconfined pathAccess) error {
 	reader, release, err := source.open(streams.In)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func runParse(streams Streams, source sourcePath, isValues valueOutput) error {
 	}
 	var values sheet.Grid
 	if isValues {
-		values = parsed.ComputeWith(computeOptions(source))
+		values = parsed.ComputeWith(computeOptions(source, isUnconfined))
 	}
 	return writeJSON(streams.Out, sheetView{Cells: cellViews(parsed, values)})
 }
@@ -64,6 +64,7 @@ func cellViews(s sheet.Sheet, values sheet.Grid) []cellView {
 // parseCommand builds the `parse` command.
 func parseCommand() *cli.Command {
 	isValues := false
+	isUnconfined := false
 	return &cli.Command{
 		Name:      cmdParse,
 		Usage:     "Parse a spreadsheet and emit its cells as JSON.",
@@ -82,9 +83,10 @@ Examples:
 				Usage:       "Include each cell's computed value",
 				Destination: &isValues,
 			},
+			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
 		},
 		Action: streamAction(func(s Streams, args positional) error {
-			return runParse(s, args.at(0), valueOutput(isValues))
+			return runParse(s, args.at(0), valueOutput(isValues), pathAccess(isUnconfined))
 		}),
 	}
 }

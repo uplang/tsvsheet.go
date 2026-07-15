@@ -20,7 +20,7 @@ func sheetFile(t *testing.T) sourcePath {
 func TestLoadServer_OK(t *testing.T) {
 	t.Parallel()
 
-	srv, err := loadServer(sheetFile(t))
+	srv, err := loadServer(sheetFile(t), false)
 	require.NoError(t, err)
 	assert.NotNil(t, srv)
 }
@@ -28,7 +28,7 @@ func TestLoadServer_OK(t *testing.T) {
 func TestLoadServer_RequiresFile(t *testing.T) {
 	t.Parallel()
 
-	_, err := loadServer("-")
+	_, err := loadServer("-", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrInvalidValue)
 }
@@ -36,7 +36,7 @@ func TestLoadServer_RequiresFile(t *testing.T) {
 func TestLoadServer_FileMissing(t *testing.T) {
 	t.Parallel()
 
-	_, err := loadServer("/no/such.tsvt")
+	_, err := loadServer("/no/such.tsvt", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrOpenFile)
 }
@@ -45,7 +45,7 @@ func TestLoadServer_SyntaxError(t *testing.T) {
 	t.Parallel()
 
 	path := writeTemp(t, "bad.tsvt", "1\t=sum(\n")
-	_, err := loadServer(sourcePath(path))
+	_, err := loadServer(sourcePath(path), false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 }
@@ -54,7 +54,7 @@ func TestSaver_WritesFile(t *testing.T) {
 	t.Parallel()
 
 	source := sheetFile(t)
-	sess, _, err := loadEditable(source)
+	sess, _, err := loadEditable(source, false)
 	require.NoError(t, err)
 
 	require.NoError(t, saver(sess, source)())
@@ -68,7 +68,7 @@ func TestSaver_WriteError(t *testing.T) {
 	t.Parallel()
 
 	source := sheetFile(t)
-	sess, _, err := loadEditable(source)
+	sess, _, err := loadEditable(source, false)
 	require.NoError(t, err)
 
 	// A directory path cannot be written as a file.

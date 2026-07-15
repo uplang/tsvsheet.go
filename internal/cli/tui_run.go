@@ -25,7 +25,7 @@ var runProgram = func(model tea.Model, in io.Reader, out io.Writer) error {
 // runTUI loads the spreadsheet into a session and edits it in the terminal UI.
 // The sheet must be a file — the TUI saves edits back to it.
 func runTUI(streams Streams, cfg tuiConfig) error {
-	sess, persist, err := loadEditable(cfg.source)
+	sess, persist, err := loadEditable(cfg.source, cfg.isUnconfined)
 	if err != nil {
 		return err
 	}
@@ -34,8 +34,9 @@ func runTUI(streams Streams, cfg tuiConfig) error {
 
 // loadEditable reads a file-backed spreadsheet into a session and returns it
 // with a persist function that writes edits back to that file. Shared by serve
-// and tui, both of which require a file source so edits can be saved.
-func loadEditable(source sourcePath) (*session.Session, func() error, error) {
+// and tui, both of which require a file source so edits can be saved. isUnconfined
+// selects the confined or unconfined sheet loader.
+func loadEditable(source sourcePath, isUnconfined pathAccess) (*session.Session, func() error, error) {
 	if source.isStdin() {
 		const msg = "requires a spreadsheet file path (e.g. `tsvsheet serve sheet.tsvt`)"
 		return nil, nil, constants.ErrInvalidValue.With(nil, "message", msg)
@@ -45,9 +46,9 @@ func loadEditable(source sourcePath) (*session.Session, func() error, error) {
 	if err != nil {
 		return nil, nil, constants.ErrOpenFile.With(err, path)
 	}
-	// Resolve SHEET(...) references within the spreadsheet's own directory, with
-	// this file as the base — so embedded sub-sheets work in serve and the TUI.
-	load := loader.FS(loader.Dir(filepath.Dir(path)))
+	// Resolve SHEET(...) and "file"! references within the spreadsheet's own
+	// directory (or any path with isUnconfined), with this file as the base.
+	load := sheetLoader(loader.Dir(filepath.Dir(path)), isUnconfined)
 	sess, err := session.NewEmbeddable(src, load, sheet.Path(filepath.Base(path)))
 	if err != nil {
 		return nil, nil, err

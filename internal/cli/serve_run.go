@@ -24,7 +24,7 @@ const filePerm = 0o600
 // until ctx is cancelled (Ctrl-C). The sheet must be a file — serve saves edits
 // back to it, so stdin is not a valid source.
 func runServe(ctx context.Context, cfg serveConfig) error {
-	server, err := loadServer(cfg.source)
+	server, err := loadServer(cfg.source, cfg.isUnconfined)
 	if err != nil {
 		return err
 	}
@@ -35,8 +35,8 @@ func runServe(ctx context.Context, cfg serveConfig) error {
 
 // loadServer reads the spreadsheet file into a session and builds the HTTP
 // server with a saver that writes edits back to that file.
-func loadServer(source sourcePath) (serve.Server, error) {
-	sess, persist, err := loadEditable(source)
+func loadServer(source sourcePath, isUnconfined pathAccess) (serve.Server, error) {
+	sess, persist, err := loadEditable(source, isUnconfined)
 	if err != nil {
 		return serve.Server{}, err
 	}

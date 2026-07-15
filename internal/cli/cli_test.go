@@ -41,7 +41,7 @@ func TestRunRender_ComputesFromStdin(t *testing.T) {
 	t.Parallel()
 
 	streams, out, _ := streamsWith(sampleSheet)
-	require.NoError(t, runRender(streams, "-"))
+	require.NoError(t, runRender(streams, "-", false))
 	assert.Equal(t, "2\t3\t5\n4\t5\t9\n", out.String())
 }
 
@@ -50,7 +50,7 @@ func TestRunRender_ReadsFile(t *testing.T) {
 
 	path := writeTemp(t, "s.tsvt", sampleSheet)
 	streams, out, _ := streamsWith("")
-	require.NoError(t, runRender(streams, sourcePath(path)))
+	require.NoError(t, runRender(streams, sourcePath(path), false))
 	assert.Contains(t, out.String(), "\t5\n")
 }
 
@@ -58,7 +58,7 @@ func TestRunRender_FileMissing(t *testing.T) {
 	t.Parallel()
 
 	streams, _, _ := streamsWith("")
-	err := runRender(streams, "/no/such.tsvt")
+	err := runRender(streams, "/no/such.tsvt", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrOpenFile)
 }
@@ -67,7 +67,7 @@ func TestRunRender_SyntaxError(t *testing.T) {
 	t.Parallel()
 
 	streams, _, _ := streamsWith("1\t=sum(\n")
-	err := runRender(streams, "-")
+	err := runRender(streams, "-", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 }
@@ -76,7 +76,7 @@ func TestRunRender_WriteError(t *testing.T) {
 	t.Parallel()
 
 	streams := Streams{In: strings.NewReader(sampleSheet), Out: failWriter{}, Err: &bytes.Buffer{}}
-	err := runRender(streams, "-")
+	err := runRender(streams, "-", false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrWriteFile)
 }
@@ -195,7 +195,7 @@ func TestRunParse_JSON(t *testing.T) {
 
 	// A middle empty cell is skipped; a literal and a formula are projected.
 	streams, out, _ := streamsWith("a\t\t=A1\n")
-	require.NoError(t, runParse(streams, "-", false))
+	require.NoError(t, runParse(streams, "-", false, false))
 	body := out.String()
 	assert.Contains(t, body, `"cell": "A1"`)
 	assert.Contains(t, body, `"source": "a"`)
@@ -208,7 +208,7 @@ func TestRunParse_SyntaxError(t *testing.T) {
 	t.Parallel()
 
 	streams, _, _ := streamsWith("1\t=sum(\n")
-	err := runParse(streams, "-", false)
+	err := runParse(streams, "-", false, false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrSyntax)
 }
@@ -217,7 +217,7 @@ func TestRunParse_FileMissing(t *testing.T) {
 	t.Parallel()
 
 	streams, _, _ := streamsWith("")
-	err := runParse(streams, "/no/such.tsvt", false)
+	err := runParse(streams, "/no/such.tsvt", false, false)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrOpenFile)
 }

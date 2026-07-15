@@ -1,12 +1,19 @@
 // Package loader is the filesystem sheet.Loader for embedded sub-sheets and
-// cross-sheet references: it resolves a path (bare, relative, or absolute) to a
-// parsed sheet. A bare or relative path resolves against the embedding sheet's
-// own directory (the top sheet's against the root the frontend fixes); an
-// absolute path is read as given. The engine (internal/sheet) stays
-// filesystem-free; this package is injected by the frontends (serve, cli).
+// cross-sheet references. Two modes trade safety for reach:
+//
+//   - FS (the secure default) confines every reference to a root directory via
+//     os.Root — a bare or relative path resolves within root, and an absolute
+//     path, a `..` escape, or a symlink out of root is rejected (#REF!).
+//   - Unconfined resolves any path — bare/relative against the referencing
+//     sheet's own directory, absolute as given — for operators who deliberately
+//     reference sheets outside the tree (enabled by a CLI flag).
+//
+// The engine (internal/sheet) stays filesystem-free; a frontend injects one of
+// these loaders.
 package loader
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 
@@ -14,28 +21,60 @@ import (
 )
 
 // Dir is the directory a top sheet's bare or relative references resolve
-// against.
+// against (and, for FS, the sandbox boundary).
 type Dir string
 
-// FS returns a sheet.Loader rooted at root: it resolves the reference to a
-// filesystem path, reads it, and parses it. The resolved (cleaned) path is
-// returned for cycle detection and as the base for the sub-sheet's own
-// references.
+// FS returns a sheet.Loader confined to root via os.Root: a reference resolves
+// relative to the referencing sheet's own directory, and anything escaping root
+// (an absolute path, a `..` traversal, a symlink out) is refused. The root is
+// opened per call, so an unopenable root surfaces as a load error (#REF!).
 func FS(root Dir) sheet.Loader {
 	return func(base, ref sheet.Path) (sheet.Sheet, sheet.Path, error) {
-		target := resolvePath(root, base, ref)
-		data, err := os.ReadFile(string(target))
+		confined, err := os.OpenRoot(string(root))
 		if err != nil {
 			return sheet.Sheet{}, "", err
 		}
-		parsed, err := sheet.Parse(data)
-		return parsed, target, err
+		defer func() { _ = confined.Close() }()
+		target := sheet.Path(filepath.Clean(filepath.Join(filepath.Dir(string(base)), string(ref))))
+		file, err := confined.Open(string(target))
+		if err != nil {
+			return sheet.Sheet{}, "", err
+		}
+		defer func() { _ = file.Close() }()
+		return parse(file, target)
 	}
 }
 
-// resolvePath resolves ref to a cleaned filesystem path: an absolute ref as
-// given; a bare or relative ref against the embedding sheet's directory (or
-// root, for the top sheet whose base is a bare filename).
+// Unconfined returns a sheet.Loader that reads any path: an absolute reference
+// as given, a bare or relative reference against the referencing sheet's own
+// directory (the top sheet's against root). It is the opt-in escape hatch for
+// referencing sheets outside the tree.
+func Unconfined(root Dir) sheet.Loader {
+	return func(base, ref sheet.Path) (sheet.Sheet, sheet.Path, error) {
+		target := resolvePath(root, base, ref)
+		file, err := os.Open(string(target))
+		if err != nil {
+			return sheet.Sheet{}, "", err
+		}
+		defer func() { _ = file.Close() }()
+		return parse(file, target)
+	}
+}
+
+// parse reads and parses a sheet from file; target is its resolved path, used
+// for cycle detection and as the base for the sub-sheet's own references.
+func parse(file io.Reader, target sheet.Path) (sheet.Sheet, sheet.Path, error) {
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return sheet.Sheet{}, "", err
+	}
+	parsed, err := sheet.Parse(data)
+	return parsed, target, err
+}
+
+// resolvePath resolves ref to a cleaned filesystem path (Unconfined): an
+// absolute ref as given; a bare or relative ref against the referencing sheet's
+// directory (or root, for the top sheet whose base is a bare filename).
 func resolvePath(root Dir, base, ref sheet.Path) sheet.Path {
 	if filepath.IsAbs(string(ref)) {
 		return sheet.Path(filepath.Clean(string(ref)))

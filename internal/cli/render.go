@@ -14,7 +14,7 @@ import (
 // when the source is a file), and writes the resulting value grid as TSV.
 // Errors go to the caller (and thence stderr); stdout carries only the computed
 // grid, so render composes in unix pipelines.
-func runRender(streams Streams, source sourcePath) error {
+func runRender(streams Streams, source sourcePath, isUnconfined pathAccess) error {
 	reader, release, err := source.open(streams.In)
 	if err != nil {
 		return err
@@ -25,26 +25,28 @@ func runRender(streams Streams, source sourcePath) error {
 	if err != nil {
 		return err
 	}
-	return sheet.WriteTSV(streams.Out, parsed.ComputeWith(computeOptions(source)))
+	return sheet.WriteTSV(streams.Out, parsed.ComputeWith(computeOptions(source, isUnconfined)))
 }
 
 // computeOptions builds the compute options for a source: a filesystem sheet
-// loader rooted at the file's directory (so SHEET embeds sibling sheets), or no
-// loader for stdin (SHEET resolves to #REF!).
-func computeOptions(source sourcePath) sheet.ComputeOptions {
+// loader rooted at the file's directory (so SHEET/"file"! resolve sibling
+// sheets), or no loader for stdin (references resolve to #REF!). isUnconfined selects
+// the confined or unconfined loader.
+func computeOptions(source sourcePath, isUnconfined pathAccess) sheet.ComputeOptions {
 	if source.isStdin() {
 		return sheet.ComputeOptions{At: time.Now()}
 	}
 	path := filepath.Clean(string(source))
 	return sheet.ComputeOptions{
 		At:     time.Now(),
-		Loader: loader.FS(loader.Dir(filepath.Dir(path))),
+		Loader: sheetLoader(loader.Dir(filepath.Dir(path)), isUnconfined),
 		Base:   sheet.Path(filepath.Base(path)),
 	}
 }
 
 // renderCommand builds the `render` command.
 func renderCommand() *cli.Command {
+	isUnconfined := false
 	return &cli.Command{
 		Name:      cmdRender,
 		Usage:     "Compute a spreadsheet and write the values as TSV.",
@@ -56,8 +58,11 @@ omitted or "-" reads stdin.
 Examples:
   tsvsheet render sheet.tsvt
   cat sheet.tsvt | tsvsheet render`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
+		},
 		Action: streamAction(func(s Streams, args positional) error {
-			return runRender(s, args.at(0))
+			return runRender(s, args.at(0), pathAccess(isUnconfined))
 		}),
 	}
 }

@@ -6,15 +6,18 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// serveConfig binds the serve command's spreadsheet path and bind address.
+// serveConfig binds the serve command's spreadsheet path, bind address, and
+// path-access mode.
 type serveConfig struct {
-	source sourcePath
-	host   string
-	port   int
+	source       sourcePath
+	host         string
+	port         int
+	isUnconfined pathAccess
 }
 
 // serveCommand builds the `serve` command.
 func serveCommand() *cli.Command {
+	isUnconfined := false
 	cfg := serveConfig{}
 	return &cli.Command{
 		Name:      cmdServe,
@@ -44,9 +47,11 @@ Examples:
 				Usage:       "Port to listen on",
 				Destination: &cfg.port,
 			},
+			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			cfg.source = positional(c.Args().Slice()).at(0)
+			cfg.isUnconfined = pathAccess(isUnconfined)
 			return runServe(ctx, cfg)
 		},
 	}
