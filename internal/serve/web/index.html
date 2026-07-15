@@ -116,7 +116,7 @@
 <body>
 <header>
   <span class="mark">tsv<b>sheet</b></span>
-  <span class="hint">a cell is a value or an =formula · click to edit</span>
+  <span class="hint">arrows move · Enter edits · a cell is a value, an =formula, or =sheet(…) embedding another sheet</span>
   <span id="reflegend" class="reflegend">
     <span><span class="swatch prec"></span>reads</span>
     <span><span class="swatch dep"></span>read by</span>
@@ -275,9 +275,29 @@
   function renderSelection() {
     els.grid.querySelectorAll("td.selected").forEach((td) => td.classList.remove("selected"));
     const td = tdAt(sel.row, sel.col);
-    if (td) td.classList.add("selected");
+    if (td) { td.classList.add("selected"); td.scrollIntoView({ block: "nearest", inline: "nearest" }); }
     els.addr.textContent = a1(sel.row, sel.col);
   }
+
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+  const MOVES = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+
+  // Keyboard navigation: arrows move the selection, Enter edits the cell — but
+  // only when no input is focused (so typing in a field is untouched).
+  document.addEventListener("keydown", (e) => {
+    if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+    const rows = sheet.computed.length;
+    const cols = width(sheet);
+    if (MOVES[e.key]) {
+      e.preventDefault();
+      const [dr, dc] = MOVES[e.key];
+      select(clamp(sel.row + dr, 0, rows - 1), clamp(sel.col + dc, 0, cols - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const td = tdAt(sel.row, sel.col);
+      if (td) editInCell(td, sel.row, sel.col);
+    }
+  });
 
   const tdAt = (r, c) => els.grid.querySelector(`td[data-row="${r}"][data-col="${c}"]`);
 
@@ -295,9 +315,10 @@
     let refs;
     try { refs = await api("GET", `/api/references?cell=${a1(r, c)}`); }
     catch { els.reflegend.classList.remove("on"); return; }
-    refs.precedents.forEach((s) => markSpan(s.from, s.to, "precedent"));
-    refs.dependents.forEach((d) => markSpan(d, d, "dependent"));
-    els.reflegend.classList.toggle("on", refs.precedents.length + refs.dependents.length > 0);
+    const prec = refs.precedents || [], deps = refs.dependents || [];
+    prec.forEach((s) => markSpan(s.from, s.to, "precedent"));
+    deps.forEach((d) => markSpan(d, d, "dependent"));
+    els.reflegend.classList.toggle("on", prec.length + deps.length > 0);
   }
 
   async function commit(r, c, text) {

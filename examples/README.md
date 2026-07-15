@@ -20,6 +20,17 @@ tsvsheet render examples/invoice.tsvt | column -t
 | [math](math.tsvt) | Error-value propagation: dividing by a zero denominator yields `#DIV/0!`, which flows through any expression that reads the cell. |
 | [squares](squares.tsvt) | The power operator (`=A2^2`, `=A2^3`) building square and cube columns, over a `Total` row that sums each column across a range (`=sum(B2:B6)`). |
 | [weather](weather.tsvt) | Per-row differences (`Range = High − Low`, `=B2-C2`) and a `Peak` summary row reducing a column with `max`/`min` (`=max(B2:B6)`, `=min(C2:C6)`). |
+| [order](order.tsvt) → [discount](discount.tsvt) | **Embedded sheets** — each `Line total` embeds the whole [discount](discount.tsvt) sheet as a function: `=sheet("discount.tsvt", C2, B2)` passes the unit price and quantity, and the cell's value is that sub-sheet's `=output(…)`. |
+
+## Embedded sheets — a spreadsheet as a function
+
+A cell can embed **an entire other sheet** and take its computed output as the cell's value, so a `.tsvt` becomes a reusable, parameterised function. Three builtins express it:
+
+- **`output(expr)`** marks a cell as the sheet's single output (its value is `expr`).
+- **`sheet(path, arg…)`** loads that sheet, computes it, and yields its `output` value; the extra arguments are passed in.
+- **`input(n)`** reads the nth argument inside the embedded sheet.
+
+So [discount.tsvt](discount.tsvt) reads `input(1)`/`input(2)`, computes a discounted total, and exposes it via `=output(C3)`; [order.tsvt](order.tsvt) embeds it per row. In the browser editor (`tsvsheet serve order.tsvt`), selecting an embedding cell shows the nested sub-sheet inline. Referenced paths resolve within the sheet's own directory; a cross-sheet cycle is `#CIRC!`, an unresolved path `#REF!`. (Run `discount.tsvt` on its own and its `input(…)` cells are `#REF!` — it is meant to be embedded.)
 
 ## A note on the language
 
