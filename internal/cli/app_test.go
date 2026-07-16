@@ -192,7 +192,7 @@ func TestRunParse_ReadError(t *testing.T) {
 	t.Parallel()
 
 	streams := Streams{In: failReader{}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	err := runParse(streams, "-", false, false, sheet.DefaultLimits())
+	err := runParse(streams, "-", false, false, sheet.DefaultLimits(), nil)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }
@@ -201,7 +201,7 @@ func TestRunRender_ReadError(t *testing.T) {
 	t.Parallel()
 
 	streams := Streams{In: failReader{}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
-	err := runRender(streams, "-", false, sheet.DefaultLimits())
+	err := runRender(streams, "-", false, sheet.DefaultLimits(), nil)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, constants.ErrReadInput)
 }

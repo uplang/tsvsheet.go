@@ -27,32 +27,42 @@ type State struct {
 
 // Session is a mutable spreadsheet. Its methods are safe for concurrent use.
 type Session struct {
-	loader      sheet.Loader
-	base        sheet.Path
-	sheet       sheet.Sheet
-	computed    sheet.Grid
-	diagnostics []sheet.Diagnostic
-	limits      sheet.Limits
-	mu          sync.Mutex
-	isDirty     bool
+	loader       sheet.Loader
+	fetcher      sheet.Fetcher
+	clearImports func()
+	base         sheet.Path
+	sheet        sheet.Sheet
+	computed     sheet.Grid
+	diagnostics  []sheet.Diagnostic
+	limits       sheet.Limits
+	mu           sync.Mutex
+	isDirty      bool
 }
 
 // New parses spreadsheet source and computes it eagerly, with no sheet loader —
-// SHEET(...) cells resolve to #REF! — and the engine's generous DefaultLimits.
-// It fails on a syntax error; the resulting session is clean (not dirty).
+// SHEET(...) cells resolve to #REF! — no import fetcher (every IMPORT* is
+// #IMPORT!), and the engine's generous DefaultLimits. It fails on a syntax
+// error; the resulting session is clean (not dirty).
 func New(src []byte) (*Session, error) {
-	return NewEmbeddable(src, nil, "", sheet.DefaultLimits())
+	return NewEmbeddable(src, nil, "", sheet.DefaultLimits(), nil)
 }
 
 // NewEmbeddable is New with an injected sheet loader, this sheet's own path (so
-// SHEET(...) cells embed other sheets resolved through loader), and the resource
-// limits the session enforces on every compute and edit.
-func NewEmbeddable(src []byte, loader sheet.Loader, base sheet.Path, limits sheet.Limits) (*Session, error) {
+// SHEET(...) cells embed other sheets resolved through loader), the resource
+// limits the session enforces on every compute and edit, and the import fetcher
+// content-typed IMPORT* cells fetch through (nil disables imports).
+func NewEmbeddable(
+	src []byte,
+	loader sheet.Loader,
+	base sheet.Path,
+	limits sheet.Limits,
+	fetcher sheet.Fetcher,
+) (*Session, error) {
 	parsed, err := sheet.Parse(src)
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{sheet: parsed, loader: loader, base: base, limits: withDefaults(limits)}
+	s := &Session{sheet: parsed, loader: loader, base: base, limits: withDefaults(limits), fetcher: fetcher}
 	s.recompute()
 	return s, nil
 }
@@ -78,7 +88,7 @@ func (s *Session) recompute() {
 // computeOptions builds the compute options for this session: its loader, base
 // path, and resource limits, with the clock sampled at call time.
 func (s *Session) computeOptions() sheet.ComputeOptions {
-	return sheet.ComputeOptions{At: time.Now(), Loader: s.loader, Base: s.base, Limits: s.limits}
+	return sheet.ComputeOptions{At: time.Now(), Loader: s.loader, Base: s.base, Limits: s.limits, Fetcher: s.fetcher}
 }
 
 // SetCell edits one cell's source text (a literal or a formula) and recomputes.
@@ -160,6 +170,32 @@ func (s *Session) IsVolatile() bool {
 func (s *Session) Recompute() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.recompute()
+	return s.state()
+}
+
+// OnRefresh registers the frontend's import-cache clear, which RefreshImports
+// invokes before recomputing so an explicit refresh drops cached fetches and
+// re-fetches. A nil clear (or none registered) makes RefreshImports a plain
+// recompute.
+func (s *Session) OnRefresh(clearFn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clearImports = clearFn
+}
+
+// RefreshImports drops any cached content-typed imports (via the
+// frontend-injected clear) and recomputes, returning the refreshed read model.
+// It is the explicit "refresh imports" action and is deliberately separate from
+// the clock auto-refresh: imports never ride the isnow ticker (ADR 0006 §6). It
+// is safe with no clear registered (a plain recompute) and when the sheet has no
+// imports. It does not affect the dirty flag.
+func (s *Session) RefreshImports() State {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.clearImports != nil {
+		s.clearImports()
+	}
 	s.recompute()
 	return s.state()
 }

@@ -67,7 +67,7 @@ func (m Model) tick() tea.Cmd {
 
 // helpNav and helpEdit are the mode hints.
 const (
-	helpNav  = "arrows/hjkl move · enter edit · ctrl+s save · q quit"
+	helpNav  = "arrows/hjkl move · enter edit · ctrl+s save · R refresh imports · q quit"
 	helpEdit = "type a value or =formula · enter commit · esc cancel"
 )
 
@@ -139,6 +139,8 @@ func (m Model) command(key string) (Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+s":
 		return m.doSave(), nil
+	case "R":
+		return m.refreshImports(), nil
 	case "q", "ctrl+c", keyEsc:
 		return m.quit()
 	default:
@@ -178,6 +180,14 @@ func (m Model) commit() Model {
 		return m
 	}
 	return m.refreshedNav()
+}
+
+// refreshImports drops any cached content-typed imports and recomputes, so the
+// next pass re-fetches. Bound to R in navigation mode; deliberately separate
+// from the auto-refresh tick — imports never ride it (ADR 0006 §6).
+func (m Model) refreshImports() Model {
+	m.state, m.status, m.isConfirmingQuit = m.session.RefreshImports(), "Imports refreshed.", false
+	return m
 }
 
 // doSave persists the spreadsheet, reporting the outcome.

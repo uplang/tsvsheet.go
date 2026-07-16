@@ -30,6 +30,7 @@ func runParse(
 	isValues valueOutput,
 	isUnconfined pathAccess,
 	limits sheet.Limits,
+	fetcher sheet.Fetcher,
 ) error {
 	reader, release, err := source.open(streams.In)
 	if err != nil {
@@ -43,7 +44,7 @@ func runParse(
 	}
 	view := sheetView{Rows: parsed.Source()}
 	if isValues {
-		view.Values = parsed.ComputeWith(computeOptions(source, isUnconfined, limits))
+		view.Values = parsed.ComputeWith(computeOptions(source, isUnconfined, limits, fetcher))
 	}
 	return writeJSON(streams.Out, view)
 }
@@ -83,16 +84,16 @@ Examples:
   tsvsheet parse --value sheet.tsvt | jq '.values'
   tsvsheet parse sheet.tsvt | tsvsheet from-json   # round-trip
   cat sheet.tsvt | tsvsheet parse`,
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.BoolFlag{
 				Name:        "value",
 				Usage:       "Include the computed grid as \"values\"",
 				Destination: &isValues,
 			},
 			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
-		},
-		Action: limitedAction(func(s Streams, args positional, limits sheet.Limits) error {
-			return runParse(s, args.at(0), valueOutput(isValues), pathAccess(isUnconfined), limits)
+		}, importFlags()...),
+		Action: importedAction(func(s Streams, args positional, limits sheet.Limits, fetcher sheet.Fetcher) error {
+			return runParse(s, args.at(0), valueOutput(isValues), pathAccess(isUnconfined), limits, fetcher)
 		}),
 	}
 }

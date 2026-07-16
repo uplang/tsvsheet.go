@@ -227,7 +227,7 @@ func TestEmbedded_OK(t *testing.T) {
 		s, err := sheet.Parse([]byte("=output(9)\n"))
 		return s, ref, err
 	}
-	sess, err := session.NewEmbeddable([]byte("=sheet(\"c\")\n"), loader, "root", sheet.DefaultLimits())
+	sess, err := session.NewEmbeddable([]byte("=sheet(\"c\")\n"), loader, "root", sheet.DefaultLimits(), nil)
 	require.NoError(t, err)
 	srv := serve.NewServer(sess, func() error { return nil }, nil)
 
@@ -295,6 +295,20 @@ func TestRecompute_ReturnsFreshState(t *testing.T) {
 	var state session.State
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
 	assert.Equal(t, "5", state.Computed[1][3]) // D2 recomputed
+}
+
+func TestRefreshImports_ReturnsFreshState(t *testing.T) {
+	t.Parallel()
+
+	// The refresh-imports action recomputes and returns the read model (the
+	// sample sheet has no imports, so it is a plain recompute here).
+	srv, _ := testServer(t)
+	rec := do(t, srv, http.MethodPost, "/api/refresh-imports", "")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var state session.State
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &state))
+	assert.Equal(t, "5", state.Computed[1][3])
 }
 
 func TestCSRF_CrossSiteMutationRefused(t *testing.T) {

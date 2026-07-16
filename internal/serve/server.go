@@ -54,6 +54,7 @@ func (srv Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/cell", srv.handleCell)
 	mux.HandleFunc("POST /api/save", srv.handleSave)
 	mux.HandleFunc("POST /api/recompute", srv.handleRecompute)
+	mux.HandleFunc("POST /api/refresh-imports", srv.handleRefreshImports)
 	mux.HandleFunc("GET /api/explain", srv.handleExplain)
 	mux.HandleFunc("GET /api/references", srv.handleReferences)
 	mux.HandleFunc("POST /api/structure", srv.handleStructure)
@@ -106,6 +107,14 @@ func (srv Server) handleRecompute(w http.ResponseWriter, _ *http.Request) {
 		State:             srv.session.Recompute(),
 		NextRefreshMillis: srv.nextRefreshMillis(),
 	})
+}
+
+// handleRefreshImports drops cached content-typed imports and recomputes,
+// returning the refreshed read model. It is the explicit "refresh imports"
+// action, distinct from POST /api/recompute (the clock refresh) — imports never
+// ride the auto-refresh ticker (ADR 0006 §6).
+func (srv Server) handleRefreshImports(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, srv.session.RefreshImports())
 }
 
 // handleState returns the current spreadsheet read model.

@@ -196,15 +196,63 @@ func TestFetch_RedirectToDisallowedHostRefused(t *testing.T) {
 	assert.ErrorIs(t, err, constants.ErrImportRedirect)
 }
 
-func TestFetch_RedirectToHTTPRefused(t *testing.T) {
+func TestFetch_RedirectToNonLoopbackHTTPRefused(t *testing.T) {
 	t.Parallel()
 
-	// The redirect target reuses the allowed host but downgrades to http → refused on scheme.
-	f, srv := tlsFetcher(t, func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "http://127.0.0.1/x", http.StatusFound)
+	// The redirect downgrades to http on a NON-loopback host that is itself
+	// allowlisted, so the refusal is on scheme (not host): plain http is only
+	// permitted for a loopback target. The hop is never actually followed.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://example.com/x", http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	f := importer.New(importer.Config{
+		Client:       srv.Client(),
+		AllowedHosts: []importer.HostPattern{"127.0.0.1", "example.com"},
+		Timeout:      2 * time.Second,
+		MaxBytes:     1024,
 	})
 	_, err := f.Fetch(sheet.ImportURL(srv.URL), cellMedia)
 	assert.ErrorIs(t, err, constants.ErrImportRedirect)
+}
+
+func TestFetch_RedirectToLoopbackHTTPFollowed(t *testing.T) {
+	t.Parallel()
+
+	// A plain-http loopback endpoint is a legitimate redirect target (reaching a
+	// local service is a primary import use case): the https→http-loopback hop is
+	// followed and its body returned.
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", string(cellMedia))
+		_, _ = w.Write([]byte("done"))
+	}))
+	t.Cleanup(plain.Close)
+	f, srv := tlsFetcher(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, plain.URL+"/final", http.StatusFound) // https → http-loopback
+	})
+	res, err := f.Fetch(sheet.ImportURL(srv.URL+"/start"), cellMedia)
+	require.NoError(t, err)
+	assert.Equal(t, "done", string(res.Body))
+}
+
+func TestFetch_LoopbackHTTPAllowed(t *testing.T) {
+	t.Parallel()
+
+	// A direct plain-http request to a loopback host is permitted: http is
+	// allowed when the target is loopback.
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", string(cellMedia))
+		_, _ = w.Write([]byte("local"))
+	}))
+	t.Cleanup(plain.Close)
+	f := importer.New(importer.Config{
+		AllowedHosts: []importer.HostPattern{"127.0.0.1"},
+		Timeout:      2 * time.Second,
+		MaxBytes:     1024,
+	})
+	res, err := f.Fetch(sheet.ImportURL(plain.URL), cellMedia)
+	require.NoError(t, err)
+	assert.Equal(t, "local", string(res.Body))
 }
 
 func TestFetch_TooManyRedirects(t *testing.T) {

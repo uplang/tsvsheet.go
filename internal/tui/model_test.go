@@ -208,6 +208,16 @@ func TestSave(t *testing.T) {
 	assert.Contains(t, m.status, "Saved")
 }
 
+func TestRefreshImports_Key(t *testing.T) {
+	t.Parallel()
+
+	// R refreshes imports (a recompute here, since the sheet has none) and reports
+	// it, leaving the model in navigation mode.
+	m := press(t, newModel(t, nil), "R")
+	assert.Equal(t, "Imports refreshed.", m.status)
+	assert.Equal(t, modeNav, m.mode)
+}
+
 func TestSave_Error(t *testing.T) {
 	t.Parallel()
 

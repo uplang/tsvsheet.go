@@ -67,6 +67,38 @@ func TestReadCapped_ReadError(t *testing.T) {
 	assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
 
+func TestIsLoopback(t *testing.T) {
+	t.Parallel()
+
+	cases := map[Host]bool{
+		"localhost":   true,  // the loopback name
+		"LocalHost":   true,  // case-insensitive
+		"127.0.0.1":   true,  // IPv4 loopback
+		"127.0.0.5":   true,  // anywhere in 127.0.0.0/8
+		"::1":         true,  // IPv6 loopback
+		"example.com": false, // a name that is not localhost
+		"8.8.8.8":     false, // a routable IP
+		"":            false, // empty is not loopback
+	}
+	for host, want := range cases {
+		assert.Equal(t, want, IsLoopback(host), string(host))
+	}
+}
+
+func TestSchemeAllowed(t *testing.T) {
+	t.Parallel()
+
+	// https is allowed for any host; http only for a loopback target; any other
+	// scheme is rejected regardless of host.
+	assert.True(t, schemeAllowed("https", "example.com"))
+	assert.True(t, schemeAllowed("https", "127.0.0.1"))
+	assert.True(t, schemeAllowed("http", "127.0.0.1"))
+	assert.True(t, schemeAllowed("http", "localhost"))
+	assert.False(t, schemeAllowed("http", "example.com"))
+	assert.False(t, schemeAllowed("ftp", "127.0.0.1"))
+	assert.False(t, schemeAllowed("file", "localhost"))
+}
+
 func TestNew_DefaultsClientAndInstallsCheckRedirect(t *testing.T) {
 	t.Parallel()
 

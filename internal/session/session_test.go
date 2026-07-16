@@ -2,15 +2,65 @@ package session_test
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/importer"
 	"github.com/uplang/tsvsheet.go/internal/session"
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
+
+// countingFetcher is a fake sheet.Fetcher that tallies its calls and returns a
+// fixed single-cell import body, so a test can observe whether a recompute
+// actually re-fetches.
+type countingFetcher struct {
+	calls *int32
+}
+
+func (f countingFetcher) Fetch(_ sheet.ImportURL, accept sheet.MediaType) (sheet.FetchResult, error) {
+	atomic.AddInt32(f.calls, 1)
+	return sheet.FetchResult{ContentType: accept, Body: []byte("42\n")}, nil
+}
+
+func TestRefreshImports_ClearsCacheAndRefetches(t *testing.T) {
+	t.Parallel()
+
+	var calls int32
+	cache := importer.NewCache(countingFetcher{calls: &calls})
+	s, err := session.NewEmbeddable(
+		[]byte(`=importcell("https://x/a")`+"\n"), nil, "", sheet.DefaultLimits(), cache,
+	)
+	require.NoError(t, err)
+	s.OnRefresh(cache.Clear)
+
+	// The eager initial compute fetched once.
+	assert.Equal(t, "42", s.Snapshot().Computed[0][0])
+	assert.EqualValues(t, 1, atomic.LoadInt32(&calls))
+
+	// A plain recompute reuses the cross-pass cache — no new fetch.
+	s.Recompute()
+	assert.EqualValues(t, 1, atomic.LoadInt32(&calls))
+
+	// RefreshImports clears the cache first, so the recompute re-fetches.
+	st := s.RefreshImports()
+	assert.Equal(t, "42", st.Computed[0][0])
+	assert.EqualValues(t, 2, atomic.LoadInt32(&calls))
+}
+
+func TestRefreshImports_NoClearIsPlainRecompute(t *testing.T) {
+	t.Parallel()
+
+	// With no clear registered and no imports, RefreshImports is a safe recompute
+	// that does not dirty the session.
+	s := newSession(t)
+	st := s.RefreshImports()
+	assert.Equal(t, "5", st.Computed[1][3])
+	assert.False(t, st.IsDirty)
+}
 
 // sampleSheet is a small spreadsheet: three data columns and a formula in D
 // that sums B and C for each row.
@@ -47,7 +97,7 @@ func TestNewEmbeddable_ZeroLimitsUseDefault(t *testing.T) {
 	// A zero (unset) Limits falls back to DefaultLimits, so an edit within the
 	// generous default grid dimension succeeds — a degenerate zero cap would
 	// reject every edit.
-	s, err := session.NewEmbeddable([]byte("1\n"), nil, "", sheet.Limits{})
+	s, err := session.NewEmbeddable([]byte("1\n"), nil, "", sheet.Limits{}, nil)
 	require.NoError(t, err)
 	require.NoError(t, s.SetCell(sheet.Address{Row: 3, Col: 0}, "x"))
 }
@@ -57,7 +107,13 @@ func TestNewEmbeddable_HonorsInjectedLimits(t *testing.T) {
 
 	// A non-zero Limits is threaded into the session's edit path: an address
 	// beyond the injected grid dimension is rejected.
-	s, err := session.NewEmbeddable([]byte("1\n"), nil, "", sheet.Limits{ResultCells: 5, GridDim: 5, ResultBytes: 5})
+	s, err := session.NewEmbeddable(
+		[]byte("1\n"),
+		nil,
+		"",
+		sheet.Limits{ResultCells: 5, GridDim: 5, ResultBytes: 5},
+		nil,
+	)
 	require.NoError(t, err)
 	err = s.SetCell(sheet.Address{Row: 5, Col: 0}, "x")
 	require.Error(t, err)
@@ -71,7 +127,7 @@ func TestNewEmbeddable_ResolvesSheetOutput(t *testing.T) {
 		s, err := sheet.Parse([]byte("=output(7)\n"))
 		return s, ref, err
 	}
-	s, err := session.NewEmbeddable([]byte("=sheet(\"child\")\n"), loader, "root", sheet.DefaultLimits())
+	s, err := session.NewEmbeddable([]byte("=sheet(\"child\")\n"), loader, "root", sheet.DefaultLimits(), nil)
 	require.NoError(t, err)
 	assert.Equal(t, "7", s.Snapshot().Computed[0][0])
 }
@@ -83,7 +139,7 @@ func TestEmbedded_ReturnsSubSheetOrNotOK(t *testing.T) {
 		s, err := sheet.Parse([]byte("=output(9)\n"))
 		return s, ref, err
 	}
-	s, err := session.NewEmbeddable([]byte("=sheet(\"c\")\n"), loader, "root", sheet.DefaultLimits())
+	s, err := session.NewEmbeddable([]byte("=sheet(\"c\")\n"), loader, "root", sheet.DefaultLimits(), nil)
 	require.NoError(t, err)
 
 	path, grid, ok := s.Embedded(sheet.Address{Row: 0, Col: 0})

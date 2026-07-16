@@ -14,7 +14,13 @@ import (
 // when the source is a file), and writes the resulting value grid as TSV.
 // Errors go to the caller (and thence stderr); stdout carries only the computed
 // grid, so render composes in unix pipelines.
-func runRender(streams Streams, source sourcePath, isUnconfined pathAccess, limits sheet.Limits) error {
+func runRender(
+	streams Streams,
+	source sourcePath,
+	isUnconfined pathAccess,
+	limits sheet.Limits,
+	fetcher sheet.Fetcher,
+) error {
 	reader, release, err := source.open(streams.In)
 	if err != nil {
 		return err
@@ -25,23 +31,29 @@ func runRender(streams Streams, source sourcePath, isUnconfined pathAccess, limi
 	if err != nil {
 		return err
 	}
-	return sheet.WriteTSV(streams.Out, parsed.ComputeWith(computeOptions(source, isUnconfined, limits)))
+	return sheet.WriteTSV(streams.Out, parsed.ComputeWith(computeOptions(source, isUnconfined, limits, fetcher)))
 }
 
 // computeOptions builds the compute options for a source: a filesystem sheet
 // loader rooted at the file's directory (so SHEET/"file"! resolve sibling
 // sheets), or no loader for stdin (references resolve to #REF!). isUnconfined
 // selects the confined or unconfined loader; limits bounds every allocation.
-func computeOptions(source sourcePath, isUnconfined pathAccess, limits sheet.Limits) sheet.ComputeOptions {
+func computeOptions(
+	source sourcePath,
+	isUnconfined pathAccess,
+	limits sheet.Limits,
+	fetcher sheet.Fetcher,
+) sheet.ComputeOptions {
 	if source.isStdin() {
-		return sheet.ComputeOptions{At: time.Now(), Limits: limits}
+		return sheet.ComputeOptions{At: time.Now(), Limits: limits, Fetcher: fetcher}
 	}
 	path := filepath.Clean(string(source))
 	return sheet.ComputeOptions{
-		At:     time.Now(),
-		Loader: sheetLoader(loader.Dir(filepath.Dir(path)), isUnconfined),
-		Base:   sheet.Path(filepath.Base(path)),
-		Limits: limits,
+		At:      time.Now(),
+		Loader:  sheetLoader(loader.Dir(filepath.Dir(path)), isUnconfined),
+		Base:    sheet.Path(filepath.Base(path)),
+		Limits:  limits,
+		Fetcher: fetcher,
 	}
 }
 
@@ -59,11 +71,11 @@ omitted or "-" reads stdin.
 Examples:
   tsvsheet render sheet.tsvt
   cat sheet.tsvt | tsvsheet render`,
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
-		},
-		Action: limitedAction(func(s Streams, args positional, limits sheet.Limits) error {
-			return runRender(s, args.at(0), pathAccess(isUnconfined), limits)
+		}, importFlags()...),
+		Action: importedAction(func(s Streams, args positional, limits sheet.Limits, fetcher sheet.Fetcher) error {
+			return runRender(s, args.at(0), pathAccess(isUnconfined), limits, fetcher)
 		}),
 	}
 }

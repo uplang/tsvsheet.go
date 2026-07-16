@@ -14,6 +14,7 @@ import (
 	"context"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -109,14 +110,15 @@ func (f Fetcher) contextFor() (context.Context, context.CancelFunc) {
 }
 
 // request builds the validated GET request: the URL must parse, its scheme must
-// be exactly https, and its host must be allowlisted — otherwise the matching
-// sentinel, before any network I/O.
+// be permitted for the host (https anywhere; http only for a loopback target),
+// and its host must be allowlisted — otherwise the matching sentinel, before any
+// network I/O.
 func (f Fetcher) request(ctx context.Context, url sheet.ImportURL, accept sheet.MediaType) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, string(url), nil)
 	if err != nil {
 		return nil, constants.ErrImportURL.With(err)
 	}
-	if req.URL.Scheme != "https" {
+	if !schemeAllowed(urlScheme(req.URL.Scheme), Host(req.URL.Hostname())) {
 		return nil, constants.ErrImportScheme
 	}
 	if !f.hostAllowed(Host(req.URL.Hostname())) {
@@ -157,14 +159,15 @@ func (f Fetcher) readCapped(body io.Reader) ([]byte, error) {
 	return data, nil
 }
 
-// checkRedirect re-validates every redirect hop: too many hops, a non-https
-// target, or a target host outside the allowlist is refused (never followed) —
-// all as ErrImportRedirect. via holds the requests already made.
+// checkRedirect re-validates every redirect hop: too many hops, a scheme not
+// permitted for the target host (http to a non-loopback hop), or a target host
+// outside the allowlist is refused (never followed) — all as ErrImportRedirect.
+// via holds the requests already made.
 func (f Fetcher) checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= maxRedirects {
 		return constants.ErrImportRedirect
 	}
-	if req.URL.Scheme != "https" {
+	if !schemeAllowed(urlScheme(req.URL.Scheme), Host(req.URL.Hostname())) {
 		return constants.ErrImportRedirect
 	}
 	if !f.hostAllowed(Host(req.URL.Hostname())) {
@@ -204,6 +207,37 @@ func matchHost(pattern HostPattern, host Host) bool {
 func wildcardMatch(suffix, host Host) bool {
 	label, ok := strings.CutSuffix(string(host), "."+string(suffix))
 	return ok && label != ""
+}
+
+// urlScheme is a request URL's scheme ("https" or "http"), checked by the scheme
+// policy against the target host.
+type urlScheme string
+
+// schemeAllowed reports whether scheme may reach host: https is permitted for
+// any host, plain http only for a loopback target (a local service — reaching
+// localhost/LAN is a primary import use case, ADR 0006 §8). Every other
+// combination (http to a remote host, or a non-http(s) scheme) is rejected.
+func schemeAllowed(scheme urlScheme, host Host) bool {
+	switch scheme {
+	case "https":
+		return true
+	case "http":
+		return IsLoopback(host)
+	default:
+		return false
+	}
+}
+
+// IsLoopback reports whether host targets the local machine: the name
+// "localhost" (case-insensitive) or any loopback IP literal (127.0.0.0/8, ::1).
+// It is the shared classifier the importer's scheme policy and serve's
+// import-exposure guard both consult.
+func IsLoopback(host Host) bool {
+	if strings.EqualFold(string(host), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(string(host))
+	return ip != nil && ip.IsLoopback()
 }
 
 // normalizeContentType parses the response Content-Type and returns its base

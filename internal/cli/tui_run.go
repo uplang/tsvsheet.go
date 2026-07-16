@@ -26,10 +26,11 @@ var runProgram = func(model tea.Model, in io.Reader, out io.Writer) error {
 // runTUI loads the spreadsheet into a session and edits it in the terminal UI.
 // The sheet must be a file — the TUI saves edits back to it.
 func runTUI(streams Streams, cfg tuiConfig) error {
-	sess, persist, err := loadEditable(cfg.source, cfg.isUnconfined, cfg.limits)
+	sess, persist, err := loadEditable(cfg.source, cfg.isUnconfined, cfg.limits, cfg.fetcher)
 	if err != nil {
 		return err
 	}
+	wireRefresh(sess, cfg.cache)
 	next, err := buildRefresh(refresh.Spec(cfg.refresh), sess)
 	if err != nil {
 		return err
@@ -45,6 +46,7 @@ func loadEditable(
 	source sourcePath,
 	isUnconfined pathAccess,
 	limits sheet.Limits,
+	fetcher sheet.Fetcher,
 ) (*session.Session, func() error, error) {
 	if source.isStdin() {
 		const msg = "requires a spreadsheet file path (e.g. `tsvsheet serve sheet.tsvt`)"
@@ -56,9 +58,10 @@ func loadEditable(
 		return nil, nil, constants.ErrOpenFile.With(err, path)
 	}
 	// Resolve SHEET(...) and "file"! references within the spreadsheet's own
-	// directory (or any path with isUnconfined), with this file as the base.
+	// directory (or any path with isUnconfined), with this file as the base;
+	// content-typed IMPORT* cells fetch through the injected fetcher (nil off).
 	load := sheetLoader(loader.Dir(filepath.Dir(path)), isUnconfined)
-	sess, err := session.NewEmbeddable(src, load, sheet.Path(filepath.Base(path)), limits)
+	sess, err := session.NewEmbeddable(src, load, sheet.Path(filepath.Base(path)), limits, fetcher)
 	if err != nil {
 		return nil, nil, err
 	}

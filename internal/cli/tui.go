@@ -1,19 +1,25 @@
 package cli
 
 import (
+	"context"
+
 	"github.com/urfave/cli/v3"
 
+	"github.com/uplang/tsvsheet.go/internal/importer"
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
 
 // tuiConfig binds the tui command's spreadsheet path, path-access mode,
-// auto-refresh cadence (a duration or an isnow pattern; empty = auto), and the
-// resource limits the editing session enforces.
+// auto-refresh cadence (a duration or an isnow pattern; empty = auto), the
+// resource limits the editing session enforces, and the content-typed import
+// fetcher (nil when imports are off) with its refresh cache.
 type tuiConfig struct {
+	fetcher      sheet.Fetcher
+	cache        *importer.Cache
 	source       sourcePath
 	refresh      string
-	isUnconfined pathAccess
 	limits       sheet.Limits
+	isUnconfined pathAccess
 }
 
 // tuiCommand builds the `tui` command.
@@ -31,19 +37,25 @@ file path.
 
 Examples:
   tsvsheet tui sheet.tsvt`,
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
 			&cli.StringFlag{
 				Name:        flagRefreshInterval,
 				Usage:       `Recompute the view: a duration (30s) or an isnow pattern ("M-F +[30mn]"); 0 disables. Default: 1s when the sheet has clock functions, else off`,
 				Destination: &cfg.refresh,
 			},
-		},
-		Action: limitedAction(func(s Streams, args positional, limits sheet.Limits) error {
-			cfg.source = args.at(0)
+		}, importFlags()...),
+		Action: func(_ context.Context, c *cli.Command) error {
+			fetcher, cache, err := resolveImport(c)
+			if err != nil {
+				return err
+			}
+			streams := Streams{In: stdin, Out: c.Root().Writer, Err: stderr}
+			cfg.source = positional(c.Args().Slice()).at(0)
 			cfg.isUnconfined = pathAccess(isUnconfined)
-			cfg.limits = limits
-			return runTUI(s, cfg)
-		}),
+			cfg.limits = maxCellsLimits(c)
+			cfg.fetcher, cfg.cache = fetcher, cache
+			return runTUI(streams, cfg)
+		},
 	}
 }

@@ -37,10 +37,12 @@ func main() {
 }
 
 // newSession builds an in-browser editing session with the tighter
-// BrowserLimits (OOM ceilings sized for a browser tab) and no sheet loader —
-// the browser has no filesystem, so SHEET(…)/"file"! references resolve to #REF!.
+// BrowserLimits (OOM ceilings sized for a browser tab), no sheet loader, and no
+// import fetcher — the browser has no filesystem (so SHEET(…)/"file"! resolve to
+// #REF!) and no operator allowlist, so content-typed imports stay disabled here
+// (every IMPORT* is #IMPORT!).
 func newSession(src []byte) (*session.Session, error) {
-	return session.NewEmbeddable(src, nil, "", sheet.BrowserLimits())
+	return session.NewEmbeddable(src, nil, "", sheet.BrowserLimits(), nil)
 }
 
 // snapshotJSON marshals the current read model.

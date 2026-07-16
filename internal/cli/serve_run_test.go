@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/uplang/tsvsheet.go/internal/importer"
 	"github.com/uplang/tsvsheet.go/internal/session"
 	"github.com/uplang/tsvsheet.go/internal/sheet"
 )
@@ -93,7 +94,7 @@ func TestSaver_WritesFile(t *testing.T) {
 	t.Parallel()
 
 	source := sheetFile(t)
-	sess, _, err := loadEditable(source, false, sheet.DefaultLimits())
+	sess, _, err := loadEditable(source, false, sheet.DefaultLimits(), nil)
 	require.NoError(t, err)
 
 	require.NoError(t, saver(sess, source)())
@@ -107,7 +108,7 @@ func TestSaver_WriteError(t *testing.T) {
 	t.Parallel()
 
 	source := sheetFile(t)
-	sess, _, err := loadEditable(source, false, sheet.DefaultLimits())
+	sess, _, err := loadEditable(source, false, sheet.DefaultLimits(), nil)
 	require.NoError(t, err)
 
 	// A directory path cannot be written as a file.
@@ -122,7 +123,7 @@ func TestRunServe_GracefulShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already cancelled → server starts then shuts down immediately
 
-	err := runServe(ctx, serveConfig{source: sheetFile(t), host: "127.0.0.1", port: 0})
+	err := runServe(ctx, serveConfig{source: sheetFile(t), host: defaultServeHost, port: 0})
 	require.NoError(t, err)
 }
 
@@ -141,7 +142,7 @@ func TestRunServe_NonLoopbackWarns(t *testing.T) {
 	cancel()
 
 	// A non-loopback host logs a warning, then shuts down on the cancelled ctx.
-	err := runServe(ctx, serveConfig{source: sheetFile(t), host: "0.0.0.0", port: 0})
+	err := runServe(ctx, serveConfig{source: sheetFile(t), host: nonLoopbackHost, port: 0})
 	require.NoError(t, err)
 }
 
@@ -153,5 +154,82 @@ func TestServeCommand_Integration(t *testing.T) {
 
 	cmd := serveCommand()
 	err := cmd.Run(ctx, []string{cmdServe, string(sheetFile(t)), "--port", "0"})
+	require.NoError(t, err)
+}
+
+// nonLoopbackHost is a bind address that is not loopback, exercising the
+// exposure guard and warning paths.
+const nonLoopbackHost = "0.0.0.0"
+
+// importFetcher builds a real (unused-at-rest) import Fetcher/Cache for the
+// exposure tests — its mere presence flips serve's import posture.
+func importFetcher() *importer.Cache {
+	return importer.NewCache(importer.New(importer.Config{}))
+}
+
+func TestGuardImportExposure(t *testing.T) {
+	t.Parallel()
+
+	cache := importFetcher()
+
+	// Imports on + a non-loopback bind → refused.
+	err := guardImportExposure(serveConfig{host: nonLoopbackHost, fetcher: cache}, loopbackBind(false))
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrImportServeExposed)
+
+	// Imports on + loopback → allowed.
+	require.NoError(t, guardImportExposure(serveConfig{host: defaultServeHost, fetcher: cache}, loopbackBind(true)))
+
+	// Imports off (nil fetcher) + non-loopback → allowed (only the file-serving
+	// warning applies there, not the import refusal).
+	require.NoError(t, guardImportExposure(serveConfig{host: nonLoopbackHost}, loopbackBind(false)))
+}
+
+func TestRunServe_ImportsOnNonLoopbackRefused(t *testing.T) {
+	t.Parallel()
+
+	cache := importFetcher()
+	err := runServe(
+		context.Background(),
+		serveConfig{source: sheetFile(t), host: nonLoopbackHost, port: 0, fetcher: cache, cache: cache},
+	)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrImportServeExposed)
+}
+
+func TestRunServe_ImportsOnLoopbackStarts(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cache := importFetcher()
+	err := runServe(
+		ctx,
+		serveConfig{source: sheetFile(t), host: defaultServeHost, port: 0, fetcher: cache, cache: cache},
+	)
+	require.NoError(t, err)
+}
+
+func TestServeCommand_AllowImportRequiresHost(t *testing.T) {
+	t.Parallel()
+
+	cmd := serveCommand()
+	err := cmd.Run(context.Background(), []string{cmdServe, "--allow-import", string(sheetFile(t)), "--port", "0"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, constants.ErrInvalidValue)
+}
+
+func TestServeCommand_AllowImportWithHost(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cmd := serveCommand()
+	err := cmd.Run(
+		ctx,
+		[]string{cmdServe, "--allow-import", "--import-host", "example.com", string(sheetFile(t)), "--port", "0"},
+	)
 	require.NoError(t, err)
 }
