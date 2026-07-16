@@ -22,12 +22,13 @@ const (
 // the same state. now is the wall clock sampled once for the pass (volatile
 // functions).
 type computer struct {
-	env    embedEnv
-	now    time.Time
-	sheet  Sheet
-	cache  [][]Value
-	phase  [][]cellPhase
-	limits Limits
+	now     time.Time
+	fetcher Fetcher
+	env     embedEnv
+	sheet   Sheet
+	cache   [][]Value
+	phase   [][]cellPhase
+	limits  Limits
 }
 
 // newComputer builds a computer sized to the sheet, with the pass clock and the
