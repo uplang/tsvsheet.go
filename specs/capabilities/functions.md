@@ -76,3 +76,5 @@ Legend: **done** · **planned** · **out** (see ADR 0004 out-of-scope). Origin: 
 ### Out of scope (ADR 0004)
 
 Network/import (`GOOGLEFINANCE IMPORTRANGE IMPORTHTML IMPORTXML IMPORTDATA IMPORTFEED WEBSERVICE`), `QUERY`, cross-sheet references, cell number-format state, `LAMBDA`/named-function macros, pivot and database (`D*`) functions.
+
+The network/import deferral is now addressed — not by these functions, but by a tsvsheet-native, content-typed, values-only import ([ADR 0006](../decisions/0006-content-typed-import.md), [import capability](import.md)): five `IMPORT{CELL,ROW,COLUMN,RANGE,SHEET}` builtins over a two-sided media-type handshake, off by default and behind an operator allowlist. The Google/Excel functions above stay out of scope.
