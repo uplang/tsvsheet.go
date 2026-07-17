@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/tsvsheet.go/internal/refresh"
+	"github.com/tsvsheet/tsvsheet.go/internal/refresh"
 )
 
 // mon1005 is a fixed instant: Monday 2026-01-05 10:05 UTC.

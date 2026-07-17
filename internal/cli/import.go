@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 	"github.com/urfave/cli/v3"
 
-	"github.com/uplang/tsvsheet.go/internal/importer"
-	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/importer"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
 )
 
 // The content-typed import flags (ADR 0006 §7–§8), registered on every command

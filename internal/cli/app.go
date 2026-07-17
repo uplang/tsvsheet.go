@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	golog "github.com/gomatic/go-log"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 	"github.com/urfave/cli/v3"
 )
 

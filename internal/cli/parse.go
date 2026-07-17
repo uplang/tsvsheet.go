@@ -3,7 +3,7 @@ package cli
 import (
 	"encoding/json"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 	"github.com/urfave/cli/v3"
 )
 

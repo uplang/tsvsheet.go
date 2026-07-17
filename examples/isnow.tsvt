@@ -1,4 +1,4 @@
-ISNOW PATTERN SHOWCASE	ISNOW("pat") is TRUE when the isnow pattern holds at the current clock — the column changes every recompute; patterns are verbatim from the uplang/isnow conformance corpus
+ISNOW PATTERN SHOWCASE	ISNOW("pat") is TRUE when the isnow pattern holds at the current clock — the column changes every recompute; patterns are verbatim from the tsvsheet/isnow conformance corpus
 Pattern	Holds now?	Means
 --- SYMBOLS: WEEKDAY NAMES (case-insensitive, minimal-unique) ---
 M noon	=isnow("M noon")	Monday at 12:00:00

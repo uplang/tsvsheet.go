@@ -3,10 +3,10 @@ package cli
 import (
 	"context"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 	"github.com/urfave/cli/v3"
 
-	"github.com/uplang/tsvsheet.go/internal/importer"
+	"github.com/tsvsheet/tsvsheet.go/internal/importer"
 )
 
 // serveConfig binds the serve command's spreadsheet path, bind address,

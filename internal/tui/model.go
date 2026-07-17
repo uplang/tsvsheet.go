@@ -9,10 +9,10 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/refresh"
-	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/refresh"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
 )
 
 // Saver persists the spreadsheet; injected so the model stays filesystem-free.

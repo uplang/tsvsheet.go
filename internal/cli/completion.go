@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // shellName is a shell the completion command can emit a script for. It is the

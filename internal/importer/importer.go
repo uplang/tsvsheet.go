@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // HostPattern is one allowlist entry: an exact host ("example.com") or a

@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/tsvsheet.go/internal/refresh"
-	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/refresh"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
 )
 
 func TestModel_AutoRefreshTick(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // TestRunEval covers the value-producing paths: a numeric expression, a

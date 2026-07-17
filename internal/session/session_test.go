@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/importer"
-	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/importer"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
 )
 
 // countingFetcher is a fake tsvsheet.Fetcher that tallies its calls and returns a

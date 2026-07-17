@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/loader"
+	"github.com/tsvsheet/tsvsheet.go/internal/loader"
 )
 
 // pathAccess selects sheet-reference confinement: references stay within the

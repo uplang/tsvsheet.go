@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 	"github.com/urfave/cli/v3"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // evalArg is the raw expression argument: the first positional, or "" to read

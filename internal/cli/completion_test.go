@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // TestCLI_Completion proves each supported shell emits a non-empty completion

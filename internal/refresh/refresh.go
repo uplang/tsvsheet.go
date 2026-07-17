@@ -1,6 +1,6 @@
 // Package refresh models an auto-refresh cadence for clock-dependent
 // (TODAY/NOW/ISNOW) cells. A cadence is either a fixed interval or an isnow
-// date/time pattern (uplang/isnow) whose next matching instant drives the next
+// date/time pattern (tsvsheet/isnow) whose next matching instant drives the next
 // refresh — so the view updates on a schedule ("every 30 min, 9-to-5, on
 // weekdays") rather than a dumb fixed tick. Both frontends (serve, tui) consume
 // a Next; the CLI builds one from the --refresh-interval flag.
@@ -9,7 +9,7 @@ package refresh
 import (
 	"time"
 
-	isnow "github.com/uplang/isnow.go"
+	isnow "github.com/tsvsheet/isnow.go"
 )
 
 // Next returns the delay from now until the next refresh; a non-positive result

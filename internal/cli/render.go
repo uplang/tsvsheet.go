@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 	"github.com/urfave/cli/v3"
 
-	"github.com/uplang/tsvsheet.go/internal/loader"
+	"github.com/tsvsheet/tsvsheet.go/internal/loader"
 )
 
 // runRender parses the spreadsheet, computes it (resolving SHEET(...) references

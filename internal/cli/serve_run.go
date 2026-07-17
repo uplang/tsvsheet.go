@@ -8,13 +8,13 @@ import (
 	"time"
 
 	httpserver "github.com/gomatic/go-httpserver"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
-	"github.com/uplang/tsvsheet.go/internal/importer"
-	"github.com/uplang/tsvsheet.go/internal/refresh"
-	"github.com/uplang/tsvsheet.go/internal/serve"
-	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/importer"
+	"github.com/tsvsheet/tsvsheet.go/internal/refresh"
+	"github.com/tsvsheet/tsvsheet.go/internal/serve"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
 )
 
 // shutdownTimeout bounds graceful shutdown when serve is interrupted.

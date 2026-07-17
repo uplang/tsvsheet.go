@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/loader"
+	"github.com/tsvsheet/tsvsheet.go/internal/loader"
 )
 
 // write creates a file (making parent directories) under dir.

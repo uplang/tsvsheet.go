@@ -1,5 +1,5 @@
 // Package cli is the tsvsheet command tier: it wires the engine (the
-// github.com/uplang/go-tsvsheet library) to urfave/cli commands with strict
+// github.com/tsvsheet/go-tsvsheet library) to urfave/cli commands with strict
 // unix stdin/stdout discipline. A .tsvt file IS the spreadsheet; every command takes it as a
 // positional argument. Command logic lives in stream-injected functions so it
 // is fully testable; the cli.Command wrappers only bind flags and streams.
@@ -9,9 +9,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // Streams are a command's injected I/O: input, output, and diagnostics. Real

@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
 )
 
 // Format selects render's output serialization for the computed value grid: TSV

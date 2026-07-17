@@ -12,11 +12,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/refresh"
-	"github.com/uplang/tsvsheet.go/internal/serve"
-	"github.com/uplang/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/refresh"
+	"github.com/tsvsheet/tsvsheet.go/internal/serve"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
 )
 
 // sampleSheet is a small spreadsheet: three data columns and a D-column formula

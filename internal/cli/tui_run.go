@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 
-	"github.com/uplang/tsvsheet.go/internal/constants"
-	"github.com/uplang/tsvsheet.go/internal/loader"
-	"github.com/uplang/tsvsheet.go/internal/refresh"
-	"github.com/uplang/tsvsheet.go/internal/session"
-	"github.com/uplang/tsvsheet.go/internal/tui"
+	"github.com/tsvsheet/tsvsheet.go/internal/constants"
+	"github.com/tsvsheet/tsvsheet.go/internal/loader"
+	"github.com/tsvsheet/tsvsheet.go/internal/refresh"
+	"github.com/tsvsheet/tsvsheet.go/internal/session"
+	"github.com/tsvsheet/tsvsheet.go/internal/tui"
 )
 
 // runProgram runs a bubbletea model over the given streams. It is a package

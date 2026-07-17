@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 )
 
 // State is the complete read model a frontend renders: the computed value grid,

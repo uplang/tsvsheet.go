@@ -3,7 +3,7 @@ package importer
 import (
 	"sync"
 
-	"github.com/uplang/go-tsvsheet"
+	"github.com/tsvsheet/go-tsvsheet"
 )
 
 // cacheKey identifies a cached fetch by the (url, accept) pair the engine asked

@@ -7,7 +7,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/uplang/tsvsheet.go/internal/cli"
+	"github.com/tsvsheet/tsvsheet.go/internal/cli"
 )
 
 // version is the application version, set via ldflags: -X main.version=1.0.0.
