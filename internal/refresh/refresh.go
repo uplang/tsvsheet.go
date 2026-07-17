@@ -9,7 +9,7 @@ package refresh
 import (
 	"time"
 
-	isnow "github.com/tsvsheet/isnow.go"
+	isnow "github.com/tsvsheet/go-isnow"
 )
 
 // Next returns the delay from now until the next refresh; a non-positive result
@@ -50,7 +50,7 @@ func Parse(spec Spec) (Next, error) {
 		}
 		return Every(d), nil
 	}
-	p, err := isnow.Parse(string(spec))
+	p, err := isnow.Parse(isnow.PatternText(spec))
 	if err != nil {
 		return nil, err
 	}
