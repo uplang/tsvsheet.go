@@ -56,7 +56,11 @@ func TestCommand_HasAllCommands(t *testing.T) {
 	for i, c := range cmd.Commands {
 		names[i] = c.Name
 	}
-	assert.ElementsMatch(t, []string{cmdRender, cmdParse, cmdFromJSON, cmdCheck, cmdExplain, cmdServe, cmdTUI}, names)
+	assert.ElementsMatch(
+		t,
+		[]string{cmdRender, cmdParse, cmdFromJSON, cmdCheck, cmdExplain, cmdEval, cmdServe, cmdTUI},
+		names,
+	)
 }
 
 func TestCLI_Render(t *testing.T) {

@@ -24,6 +24,7 @@ Commands:
   parse   <sheet>          Emit a sheet's cells as JSON
   check   <sheet>          Validate (exit 0 clean / 1 diags / 2 syntax)
   explain <cell> <sheet>   Trace how one computed cell was produced
+  eval    <expression>     Compute a single formula, print its value
   serve   <sheet>          Browser spreadsheet editor
   tui     <sheet>          Terminal spreadsheet editor
 
@@ -46,6 +47,7 @@ const (
 	cmdFromJSON = "from-json"
 	cmdCheck    = "check"
 	cmdExplain  = "explain"
+	cmdEval     = "eval"
 	cmdServe    = "serve"
 	cmdTUI      = "tui"
 )
@@ -83,6 +85,7 @@ func Command(v Version) *cli.Command {
 			fromJSONCommand(),
 			checkCommand(),
 			explainCommand(),
+			evalCommand(),
 			serveCommand(),
 			tuiCommand(),
 		},
