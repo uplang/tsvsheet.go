@@ -141,6 +141,11 @@ pv	=round(pv(0.05/12, 60, -100), 2)
 npv	=round(npv(0.1, 100, 200, 300), 2)
 sln	=sln(10000, 1000, 5)
 
+--- ARRAY COMPOSITION (an inner array result is consumed like a range; both spellings are one formula) ---
+sum(sort(...))	=sum(sort(D2:D6))
+count(unique(...))	=count(unique(D2:D6))
+pipe chain	=D2:D6 | sort() | unique() | count()
+index(sort(...), 2)	=index(sort(D2:D6), 2)
 --- ARRAY (dynamic arrays; each result SPILLS down its column) ---
 function ->	sequence(6,1)	transpose(D8:G8)	unique(D2:D6)	sort(D2:D6)	filter(D2:D6,H2:H6)	flatten(E2:F5)
 result ->	=sequence(6,1)	=transpose(D8:G8)	=unique(D2:D6)	=sort(D2:D6)	=filter(D2:D6,H2:H6)	=flatten(E2:F5)

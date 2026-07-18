@@ -54,6 +54,6 @@ A `.tsvt` **is** the spreadsheet: there is no separate data file. Each cell is a
 
 Worth knowing when you edit these: references are A1 (`B2`, `$B$2`, ranges `D2:D5`); `%` is postfix percent (`50%` = 0.5), so modulo is the `mod(a, b)` function.
 
-Formulas can also chain through the **pipe operator** (§5.4 of the spec): `x | f(a)` is pure sugar for `f(x, a)`, left-associative and loosest-binding, so `=A1/B1 | log(2) | round(1)` is `round(log(A1/B1, 2), 1)`. The right-hand side must be a call with parentheses (`=A1 | len` is a syntax error). The [caffeine](caffeine.tsvt) and [password-lab](password-lab.tsvt) sheets are written entirely in this style.
+Formulas can also chain through the **pipe operator** (§5.4 of the spec): `x | f(a)` is pure sugar for `f(x, a)`, left-associative and loosest-binding, so `=A1/B1 | log(2) | round(1)` is `round(log(A1/B1, 2), 1)`. The right-hand side must be a call with parentheses (`=A1 | len` is a syntax error). Array stages compose too — an inner array result is consumed by the next function exactly like a range, so `=A2:A10 | sort() | unique() | count()` counts the distinct values. The [caffeine](caffeine.tsvt) and [password-lab](password-lab.tsvt) sheets are written entirely in this style.
 
 The full language is specified in [tsvsheet/tsvsheet](https://github.com/tsvsheet/tsvsheet).
