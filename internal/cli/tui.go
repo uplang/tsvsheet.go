@@ -36,7 +36,7 @@ browser editor, driven by the same engine. The sheet is a required positional
 file path.
 
 Examples:
-  tsvsheet tui sheet.tsvt`,
+  tsv tui sheet.tsvt`,
 		Flags: append([]cli.Flag{
 			&cli.BoolFlag{Name: flagAllowAnyPaths, Usage: usageAllowAnyPaths, Destination: &isUnconfined},
 			&cli.StringFlag{

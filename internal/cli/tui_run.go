@@ -49,7 +49,7 @@ func loadEditable(
 	fetcher tsvsheet.Fetcher,
 ) (*session.Session, func() error, error) {
 	if source.isStdin() {
-		const msg = "requires a spreadsheet file path (e.g. `tsvsheet serve sheet.tsvt`)"
+		const msg = "requires a spreadsheet file path (e.g. `tsv serve sheet.tsvt`)"
 		return nil, nil, tsvsheet.ErrInvalidValue.With(nil, "message", msg)
 	}
 	path := filepath.Clean(string(source))

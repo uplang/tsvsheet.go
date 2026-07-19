@@ -73,10 +73,10 @@ write the computed value grid to stdout. The sheet is positional; omitted or
 html (a <table>), or markdown (a pipe table; md is an alias).
 
 Examples:
-  tsvsheet render sheet.tsvt
-  tsvsheet render --format csv sheet.tsvt
-  tsvsheet render -f markdown sheet.tsvt
-  cat sheet.tsvt | tsvsheet render`,
+  tsv render sheet.tsvt
+  tsv render --format csv sheet.tsvt
+  tsv render -f markdown sheet.tsvt
+  cat sheet.tsvt | tsv render`,
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:        flagFormat,

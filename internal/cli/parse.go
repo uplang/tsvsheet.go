@@ -78,10 +78,10 @@ from-json and clean to munge with jq. With --value, the computed grid is
 included as "values".
 
 Examples:
-  tsvsheet parse sheet.tsvt | jq '.rows[1]'
-  tsvsheet parse --value sheet.tsvt | jq '.values'
-  tsvsheet parse sheet.tsvt | tsvsheet from-json   # round-trip
-  cat sheet.tsvt | tsvsheet parse`,
+  tsv parse sheet.tsvt | jq '.rows[1]'
+  tsv parse --value sheet.tsvt | jq '.values'
+  tsv parse sheet.tsvt | tsv from-json   # round-trip
+  cat sheet.tsvt | tsv parse`,
 		Flags: append([]cli.Flag{
 			&cli.BoolFlag{
 				Name:        "value",
@@ -109,8 +109,8 @@ omitted or "-" reads stdin) and write the spreadsheet back as TSV to stdout —
 the inverse of parse. Computed "values" in the input are ignored.
 
 Examples:
-  tsvsheet parse sheet.tsvt | tsvsheet from-json
-  jq '.rows[0] |= ascii_upcase' data.json | tsvsheet from-json`,
+  tsv parse sheet.tsvt | tsv from-json
+  jq '.rows[0] |= ascii_upcase' data.json | tsv from-json`,
 		Action: streamAction(func(s Streams, args positional) error {
 			return runFromJSON(s, args.at(0))
 		}),

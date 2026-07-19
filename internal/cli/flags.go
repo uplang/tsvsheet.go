@@ -19,7 +19,7 @@ const jsonFlag = "json"
 
 // positional is a command's positional arguments. Required inputs (the .tsvt
 // spreadsheet path, and the cell address for explain) are positional — never
-// flags — so invocations read as `tsvsheet explain D2 sheet.tsvt`.
+// flags — so invocations read as `tsv explain D2 sheet.tsvt`.
 type positional []string
 
 // at returns the i-th positional argument as a source path, or "" (meaning

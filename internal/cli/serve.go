@@ -51,8 +51,8 @@ This is a single-user local editor: the browser reads and WRITES host files
 non-loopback --host on an untrusted network.
 
 Examples:
-  tsvsheet serve sheet.tsvt
-  tsvsheet serve --host 0.0.0.0 --port 8080 sheet.tsvt`,
+  tsv serve sheet.tsvt
+  tsv serve --host 0.0.0.0 --port 8080 sheet.tsvt`,
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:        "host",

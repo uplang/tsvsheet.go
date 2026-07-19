@@ -74,13 +74,13 @@ func completionCommand() *cli.Command {
 		Usage:     "Print a shell completion script for bash, zsh, or fish.",
 		ArgsUsage: "<shell>",
 		Description: `Print the shell completion script for the named shell (bash, zsh, or fish)
-to stdout. Source the output to enable completion of tsvsheet's commands and
+to stdout. Source the output to enable completion of tsv's commands and
 flags.
 
 Examples:
-  source <(tsv completion bash)                            # .bashrc
-  source <(tsv completion zsh)                             # .zshrc
-  tsv completion fish > ~/.config/fish/completions/tsvsheet.fish`,
+  source <(tsv completion bash)                       # .bashrc
+  source <(tsv completion zsh)                        # .zshrc
+  tsv completion fish > ~/.config/fish/completions/tsv.fish`,
 		Action: func(ctx context.Context, c *cli.Command) error {
 			return runCompletion(ctx, c.Root(), shellName(c.Args().First()))
 		},
