@@ -20,7 +20,7 @@ func TestBuildRefresh(t *testing.T) {
 
 	plain, err := session.New([]byte(sampleSheet)) // no clock functions
 	require.NoError(t, err)
-	volatile, err := session.New([]byte("=now()\n"))
+	volatile, err := session.New([]byte("=volatile(now())\n"))
 	require.NoError(t, err)
 
 	// An explicit interval wins.
@@ -232,4 +232,15 @@ func TestServeCommand_AllowImportWithHost(t *testing.T) {
 		[]string{cmdServe, "--allow-import", "--import-host", "example.com", string(sheetFile(t)), "--port", "0"},
 	)
 	require.NoError(t, err)
+}
+
+func TestBuildRefresh_ScheduledCadence(t *testing.T) {
+	t.Parallel()
+
+	// A volatile() carrying its own isnow/duration cadence drives that cadence.
+	scheduled, err := session.New([]byte("=volatile(rand(), \"5m\")\n"))
+	require.NoError(t, err)
+	next, err := buildRefresh("", scheduled)
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Minute, next(time.Now()))
 }

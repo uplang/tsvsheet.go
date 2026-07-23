@@ -94,8 +94,10 @@ func loadServer(cfg serveConfig) (serve.Server, error) {
 
 // buildRefresh is the auto-refresh cadence shared by serve and the TUI: an
 // explicit --refresh-interval (a duration or an isnow pattern, or 0 to disable)
-// when spec is given, else a 1s default when the sheet has clock-dependent
-// functions (TODAY/NOW/ISNOW), else off. A malformed pattern is an error.
+// overrides everything when given; otherwise the sheet's own volatile(…)
+// cadences are unioned to the soonest next instant, with a 1s default for any
+// volatile() carrying no schedule of its own, else off. A malformed pattern is
+// an error.
 func buildRefresh(spec refresh.Spec, sess *session.Session) (refresh.Next, error) {
 	if spec != "" {
 		next, err := refresh.Parse(spec)
@@ -104,10 +106,16 @@ func buildRefresh(spec refresh.Spec, sess *session.Session) (refresh.Next, error
 		}
 		return next, nil
 	}
-	if sess.IsVolatile() {
-		return refresh.Every(defaultRefresh), nil
+	return refresh.Union(scheduleSpecs(sess.VolatileSchedules()), refresh.Every(defaultRefresh))
+}
+
+// scheduleSpecs adapts a session's volatile-cadence strings to refresh specs.
+func scheduleSpecs(schedules []string) []refresh.Spec {
+	specs := make([]refresh.Spec, len(schedules))
+	for i, s := range schedules {
+		specs[i] = refresh.Spec(s)
 	}
-	return nil, nil
+	return specs
 }
 
 // saver builds the persist function: it writes the session's current source

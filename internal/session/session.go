@@ -156,12 +156,21 @@ func (s *Session) state() State {
 	}
 }
 
-// IsVolatile reports whether the sheet contains clock-dependent functions
-// (TODAY/NOW/ISNOW), so a frontend can enable periodic recomputation.
+// IsVolatile reports whether the sheet wraps any expression in volatile(…), so a
+// frontend can enable periodic recomputation.
 func (s *Session) IsVolatile() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.sheet.IsVolatile()
+}
+
+// VolatileSchedules returns the refresh-cadence spec of every volatile(…) cell
+// (empty for one with no schedule of its own), which a frontend unions into a
+// single auto-refresh cadence.
+func (s *Session) VolatileSchedules() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sheet.VolatileSchedules()
 }
 
 // Recompute re-evaluates the sheet against the current clock without changing

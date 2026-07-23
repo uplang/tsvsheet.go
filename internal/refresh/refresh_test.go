@@ -55,3 +55,60 @@ func TestParse_MalformedPattern(t *testing.T) {
 	_, err := refresh.Parse("garbage!!!")
 	require.Error(t, err)
 }
+
+func TestUnion(t *testing.T) {
+	t.Parallel()
+
+	def := refresh.Every(time.Second)
+
+	// No specs → nil (no cadence).
+	none, err := refresh.Union(nil, def)
+	require.NoError(t, err)
+	assert.Nil(t, none)
+
+	// Empty specs use the default cadence.
+	byDefault, err := refresh.Union([]refresh.Spec{""}, def)
+	require.NoError(t, err)
+	assert.Equal(t, time.Second, byDefault(mon1005))
+
+	// The soonest across a fast and a slow explicit cadence wins.
+	mixed, err := refresh.Union([]refresh.Spec{"1m", "5s"}, def)
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Second, mixed(mon1005))
+
+	// A default (1s) beats a slower explicit cadence.
+	withDefault, err := refresh.Union([]refresh.Spec{"1m", ""}, def)
+	require.NoError(t, err)
+	assert.Equal(t, time.Second, withDefault(mon1005))
+
+	// A disabled explicit spec ("0s") contributes no cadence; the default remains.
+	withDisabled, err := refresh.Union([]refresh.Spec{"0s", ""}, def)
+	require.NoError(t, err)
+	assert.Equal(t, time.Second, withDisabled(mon1005))
+
+	// Every entry disabled → nil.
+	allOff, err := refresh.Union([]refresh.Spec{"0s"}, nil)
+	require.NoError(t, err)
+	assert.Nil(t, allOff)
+
+	// A malformed pattern is rejected.
+	_, err = refresh.Union([]refresh.Spec{"garbage!!!"}, def)
+	require.Error(t, err)
+}
+
+func TestUnion_EdgeBranches(t *testing.T) {
+	t.Parallel()
+
+	def := refresh.Every(time.Second)
+
+	// A slower cadence after a faster one keeps the faster (earlier "keep best").
+	ordered, err := refresh.Union([]refresh.Spec{"5s", "1m"}, def)
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Second, ordered(mon1005))
+
+	// A pattern with no future instant yields 0 (stop), not a bogus wait.
+	past, err := refresh.Union([]refresh.Spec{"12 <2020"}, nil)
+	require.NoError(t, err)
+	require.NotNil(t, past)
+	assert.Zero(t, past(mon1005))
+}

@@ -38,6 +38,56 @@ func pattern(p isnow.Pattern) Next {
 // isnow pattern ("M-F +[30mn] >=9 <=17").
 type Spec string
 
+// Union combines the cadence specs of every volatile(…) cell into one Next that
+// fires at the soonest next refresh across them. An empty spec — a volatile()
+// with no schedule of its own — uses def, the frontend's default cadence. The
+// result is nil when no spec yields a cadence. A malformed pattern is an error.
+func Union(specs []Spec, def Next) (Next, error) {
+	nexts := make([]Next, 0, len(specs))
+	for _, spec := range specs {
+		next, err := resolveSpec(spec, def)
+		if err != nil {
+			return nil, err
+		}
+		if next != nil {
+			nexts = append(nexts, next)
+		}
+	}
+	return soonest(nexts), nil
+}
+
+// resolveSpec parses one spec, substituting def for the empty (default) spec.
+func resolveSpec(spec Spec, def Next) (Next, error) {
+	if spec == "" {
+		return def, nil
+	}
+	return Parse(spec)
+}
+
+// soonest returns a Next yielding the smallest positive delay across nexts, or 0
+// (stop) when none is due; nil when there are no cadences.
+func soonest(nexts []Next) Next {
+	if len(nexts) == 0 {
+		return nil
+	}
+	return func(now time.Time) time.Duration {
+		best := time.Duration(0)
+		for _, next := range nexts {
+			best = earlier(best, next(now))
+		}
+		return best
+	}
+}
+
+// earlier returns the sooner of two delays, treating 0 as "none yet" and
+// ignoring non-positive (stopped) cadences.
+func earlier(best, d time.Duration) time.Duration {
+	if d > 0 && (best == 0 || d < best) {
+		return d
+	}
+	return best
+}
+
 // Parse builds a Next from spec. An empty spec, or a non-positive duration, is a
 // disabled cadence (nil). A malformed pattern is an error.
 func Parse(spec Spec) (Next, error) {

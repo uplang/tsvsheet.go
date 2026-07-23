@@ -156,7 +156,7 @@ func TestIsVolatileAndRecompute(t *testing.T) {
 
 	// sampleSheet has no clock functions.
 	assert.False(t, newSession(t).IsVolatile())
-	v, err := session.New([]byte("=now()\n"))
+	v, err := session.New([]byte("=volatile(now())\n"))
 	require.NoError(t, err)
 	assert.True(t, v.IsVolatile())
 
@@ -325,4 +325,14 @@ func TestConcurrentAccess(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestVolatileSchedules(t *testing.T) {
+	t.Parallel()
+
+	assert.Empty(t, newSession(t).VolatileSchedules())
+
+	v, err := session.New([]byte("=volatile(rand(), \"5m\")\n"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"5m"}, v.VolatileSchedules())
 }
